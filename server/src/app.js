@@ -3,14 +3,24 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
+import { authenticate } from './auth/authenticate.js';
+import { csrfProtection } from './auth/csrf.js';
+import { apiRateLimiter, authRateLimiter } from './auth/rateLimits.js';
 import { config } from './config.js';
 import { errorHandler, notFoundHandler } from './lib/errors.js';
 import { bigIntReplacer } from './lib/json.js';
 import { logger } from './lib/logger.js';
 import { requestId } from './lib/requestId.js';
+import { createAuthRouter } from './modules/auth/routes.js';
 import { healthRouter } from './modules/health/routes.js';
+import { usersRouter } from './modules/users/routes.js';
 
-export function createApp() {
+/**
+ * @param {object} [options]
+ * @param {number} [options.authRateLimitPerMinute]  override for tests
+ * @param {number} [options.apiRateLimitPerMinute]   override for tests
+ */
+export function createApp(options = {}) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -47,7 +57,23 @@ export function createApp() {
   app.use(cookieParser());
 
   const api = express.Router();
+  // Responses carry personal data; never let a shared cache keep them.
+  api.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
+  api.use(csrfProtection); // BR-AUTH-03: every POST/PUT/PATCH/DELETE
+  api.use(authenticate); // sets req.principal on every request
+  api.use(apiRateLimiter(options.apiRateLimitPerMinute ?? config.auth.apiRateLimitPerMinute));
+
   api.use(healthRouter);
+  api.use(
+    '/auth',
+    createAuthRouter({
+      authLimiter: authRateLimiter(options.authRateLimitPerMinute ?? config.auth.authRateLimitPerMinute),
+    }),
+  );
+  api.use('/users', usersRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
