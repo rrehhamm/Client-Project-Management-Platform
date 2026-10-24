@@ -1,0 +1,264 @@
+// The permission matrix of BRD section 4.2, as data.
+//
+// RULES[action][roleKey] is either `true` (always allowed for that role) or a
+// predicate (principal, ctx) => boolean for scoped rules ("member", "own",
+// "Client-visible"). A missing role key means no access.
+//
+// roleKey is the internal role (Owner, Admin, PM, TeamMember, Finance) or
+// 'Contact' for client contacts.
+//
+// ctx is filled by the route's loader with whatever the rule needs:
+//   ctx.membership  the principal's ProjectMember row on the project (or null)
+//   ctx.project     { client_id, portal_enabled }
+//   ctx.record      the item acted on: { visibility, created_by | author_id | user_id,
+//                   assignee_ids, status, client_id, is_finance_event }
+//   ctx.target      the user being managed (users module)
+//   ctx.client      { id } for client records
+//   ctx.memberOfClient       Team Member belongs to a project of this client
+//   ctx.isApprover           contact is listed on the approval request
+//   ctx.contactCanApprove    contact holds Approve level on a project of the record's client
+//
+// Business rules that are not permissions (e.g. "last administrator", "status
+// must be Draft") live in the services and return 409/422.
+//
+// Deviations from the matrix, each recorded in docs/DECISIONS.md:
+//   D-06 Finance may update user rates (FR-USER-07 over the matrix "—").
+//   D-09 PM may create time entries for members (FR-TIME-08 over the matrix "R").
+//   D-10 PM approval requests and member management are limited to member projects.
+import { PORTAL_LEVEL_ORDER, ROLES, TIME_ENTRY_STATUS, VISIBILITY } from '@cpm/shared';
+
+export const CONTACT = 'Contact';
+const { OWNER, ADMIN, PM, TEAM_MEMBER, FINANCE } = ROLES;
+
+// ---- predicates -------------------------------------------------------------
+
+const and =
+  (...preds) =>
+  (p, c) =>
+    preds.every((f) => f(p, c));
+const or =
+  (...preds) =>
+  (p, c) =>
+    preds.some((f) => f(p, c));
+
+const isMember = (_p, c) => Boolean(c.membership);
+const ownerIdOf = (r) => r?.author_id ?? r?.user_id ?? r?.created_by ?? null;
+const isOwn = (p, c) => ownerIdOf(c.record) === p.id;
+const isAssigned = (p, c) => Array.isArray(c.record?.assignee_ids) && c.record.assignee_ids.includes(p.id);
+
+const portalLevelAtLeast = (level) => (_p, c) =>
+  PORTAL_LEVEL_ORDER.indexOf(c.membership?.portal_level) >= PORTAL_LEVEL_ORDER.indexOf(level);
+
+/** Contact is on this project of their own client, and the portal is on (BR-CLI-01, FR-PORT-08). */
+const contactOnProject = (p, c) =>
+  Boolean(c.project) &&
+  c.project.client_id === p.client_id &&
+  c.project.portal_enabled === true &&
+  Boolean(c.membership) &&
+  c.membership.contact_id === p.id;
+
+const clientVisible = (_p, c) => c.record?.visibility === VISIBILITY.CLIENT;
+const contactSeesRecord = and(contactOnProject, clientVisible);
+const contactCanComment = and(contactOnProject, portalLevelAtLeast('Comment'));
+const ownClientRecord = (p, c) => Boolean(c.record) && c.record.client_id === p.client_id;
+const contactApproves = (_p, c) => c.contactCanApprove === true;
+
+const targetIsNotOwner = (_p, c) => Boolean(c.target) && c.target.role !== OWNER;
+const targetIsTeamMember = (_p, c) => c.target?.role === TEAM_MEMBER;
+const timeEntryEditable = (p, c) =>
+  isOwn(p, c) && [TIME_ENTRY_STATUS.DRAFT, TIME_ENTRY_STATUS.REJECTED].includes(c.record?.status);
+
+const ALL_INTERNAL = { [OWNER]: true, [ADMIN]: true, [PM]: true, [TEAM_MEMBER]: true, [FINANCE]: true };
+const OWNER_ADMIN = { [OWNER]: true, [ADMIN]: true };
+
+// ---- the matrix ---------------------------------------------------------------
+
+export const RULES = {
+  // Workspace settings, branding
+  'workspace.read': { ...OWNER_ADMIN },
+  'workspace.update': { ...OWNER_ADMIN },
+  'workspace.delete': { [OWNER]: true }, // BR-USER-04, also billing plan
+  'workspace.transferOwnership': { [OWNER]: true }, // BR-ROLE-01
+
+  // Users: invite, change role, deactivate
+  'user.list': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true },
+  'user.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true },
+  'user.viewRates': { ...OWNER_ADMIN, [FINANCE]: true }, // FR-USER-07
+  'user.invite': { [OWNER]: targetIsNotOwner, [ADMIN]: targetIsNotOwner, [PM]: targetIsTeamMember },
+  'user.manageInvitation': { [OWNER]: targetIsNotOwner, [ADMIN]: targetIsNotOwner, [PM]: targetIsTeamMember },
+  'user.update': { [OWNER]: true, [ADMIN]: targetIsNotOwner }, // name, capacity
+  'user.changeRole': { [OWNER]: true, [ADMIN]: targetIsNotOwner },
+  'user.updateRates': { [OWNER]: true, [ADMIN]: targetIsNotOwner, [FINANCE]: true }, // D-06
+  'user.deactivate': { [OWNER]: true, [ADMIN]: targetIsNotOwner },
+
+  // Clients
+  'client.create': { ...OWNER_ADMIN, [PM]: true },
+  'client.read': {
+    ...OWNER_ADMIN,
+    [PM]: true,
+    [FINANCE]: true,
+    [TEAM_MEMBER]: (_p, c) => c.memberOfClient === true, // name only
+    [CONTACT]: (p, c) => c.client?.id === p.client_id, // own company profile
+  },
+  'client.readDetails': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true }, // incl. internal notes (FR-CLI-08)
+  'client.update': { ...OWNER_ADMIN, [PM]: true },
+  'client.delete': { ...OWNER_ADMIN },
+
+  // Client contacts / portal invites
+  'contact.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true },
+  'contact.create': { ...OWNER_ADMIN, [PM]: true },
+  'contact.update': { ...OWNER_ADMIN, [PM]: true },
+  'contact.delete': { ...OWNER_ADMIN, [PM]: true },
+
+  // Projects
+  'project.create': { ...OWNER_ADMIN, [PM]: true },
+  'project.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactOnProject,
+  },
+  'project.update': { ...OWNER_ADMIN, [PM]: isMember }, // incl. status changes (BRD 16.1)
+  'project.delete': { ...OWNER_ADMIN },
+
+  // Project members
+  'projectMember.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactOnProject, // names only
+  },
+  'projectMember.manage': { ...OWNER_ADMIN, [PM]: isMember }, // D-10
+
+  // Milestones
+  'milestone.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactSeesRecord,
+  },
+  'milestone.create': { ...OWNER_ADMIN, [PM]: isMember },
+  'milestone.update': { ...OWNER_ADMIN, [PM]: isMember },
+  'milestone.delete': { ...OWNER_ADMIN, [PM]: isMember },
+
+  // Tasks
+  'task.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactSeesRecord,
+  },
+  'task.create': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember },
+  'task.request': { [CONTACT]: contactCanComment }, // FR-PORT-03 client request
+  'task.update': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, or(isOwn, isAssigned)) },
+  'task.delete': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) },
+  'task.changeVisibility': { ...OWNER_ADMIN, [PM]: isMember }, // FR-TSK-14, BR-TSK-05
+
+  // Comments (on projects, tasks, files, approvals)
+  'comment.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactSeesRecord,
+  },
+  'comment.create': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactCanComment,
+  },
+  'comment.update': {
+    [OWNER]: isOwn,
+    [ADMIN]: isOwn,
+    [PM]: isOwn,
+    [TEAM_MEMBER]: isOwn,
+    [FINANCE]: isOwn,
+    [CONTACT]: and(contactSeesRecord, isOwn),
+  },
+  'comment.delete': {
+    ...OWNER_ADMIN, // FR-COM-04: Admin can delete any
+    [PM]: isOwn,
+    [TEAM_MEMBER]: isOwn,
+    [FINANCE]: isOwn,
+    [CONTACT]: and(contactSeesRecord, isOwn),
+  },
+
+  // Files
+  'file.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: isMember,
+    [FINANCE]: true,
+    [CONTACT]: contactSeesRecord,
+  },
+  'file.create': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember, [CONTACT]: contactCanComment },
+  'file.update': { ...OWNER_ADMIN, [PM]: isMember }, // rename, visibility (FR-FILE-07)
+  'file.delete': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) },
+
+  // Approvals
+  'approval.request': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember }, // D-10
+  'approval.decide': {
+    [CONTACT]: and(contactOnProject, portalLevelAtLeast('Approve'), (_p, c) => c.isApprover === true),
+  }, // BR-APP-02: internal users never decide
+
+  // Time entries and timesheets
+  'timeEntry.read': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isOwn, [FINANCE]: true },
+  'timeEntry.create': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) }, // D-09
+  'timeEntry.update': { ...OWNER_ADMIN, [TEAM_MEMBER]: timeEntryEditable },
+  'timeEntry.delete': { ...OWNER_ADMIN, [TEAM_MEMBER]: timeEntryEditable },
+  'timesheet.approve': { ...OWNER_ADMIN, [PM]: isMember }, // FR-TIME-05
+
+  // Proposals and contracts
+  'proposal.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
+  'proposal.create': { ...OWNER_ADMIN, [PM]: true },
+  'proposal.update': { ...OWNER_ADMIN, [PM]: true },
+  'proposal.delete': { ...OWNER_ADMIN, [PM]: true },
+  'proposal.accept': { [CONTACT]: and(ownClientRecord, contactApproves) },
+  'contract.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
+  'contract.create': { ...OWNER_ADMIN, [PM]: true },
+  'contract.update': { ...OWNER_ADMIN, [PM]: true },
+  'contract.delete': { ...OWNER_ADMIN, [PM]: true },
+  'contract.sign': { ...OWNER_ADMIN, [PM]: true, [CONTACT]: and(ownClientRecord, contactApproves) },
+
+  // Invoices and payments
+  'invoice.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
+  'invoice.create': { ...OWNER_ADMIN, [FINANCE]: true },
+  'invoice.update': { ...OWNER_ADMIN, [FINANCE]: true },
+  'invoice.delete': { ...OWNER_ADMIN, [FINANCE]: true },
+  'invoice.pay': { [CONTACT]: and(ownClientRecord, contactApproves) },
+  'payment.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
+  'payment.create': { ...OWNER_ADMIN, [FINANCE]: true },
+  'payment.update': { ...OWNER_ADMIN, [FINANCE]: true },
+  'payment.delete': { ...OWNER_ADMIN, [FINANCE]: true },
+
+  // Expenses
+  'expense.read': { ...OWNER_ADMIN, [PM]: true, [TEAM_MEMBER]: isOwn, [FINANCE]: true },
+  'expense.create': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn), [FINANCE]: true },
+  'expense.update': { ...OWNER_ADMIN, [FINANCE]: true },
+  'expense.delete': { ...OWNER_ADMIN, [FINANCE]: true },
+
+  // Reports (profitability, utilisation) and financial dashboard cards (BR-DASH-03)
+  'report.read': { ...OWNER_ADMIN, [PM]: isMember, [FINANCE]: true },
+  'finance.viewCards': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true },
+
+  // Activity / audit log
+  'activity.read': {
+    ...OWNER_ADMIN,
+    [PM]: isMember,
+    [TEAM_MEMBER]: and(isMember, (_p, c) => c.record?.is_finance_event !== true),
+    [FINANCE]: (_p, c) => c.record?.is_finance_event === true,
+  },
+  'audit.readAll': { ...OWNER_ADMIN }, // FR-ACT-02 admin view
+
+  // Things every internal user may do on their own account
+  'self.internalApp': { ...ALL_INTERNAL },
+  'self.portal': { [CONTACT]: true },
+};
+
+export const ACTIONS = Object.freeze(Object.keys(RULES));
