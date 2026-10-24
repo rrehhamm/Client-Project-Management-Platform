@@ -4,8 +4,10 @@
 //
 //   --no-docker   use your own Postgres/S3/SMTP (from .env) instead of docker compose
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { appendFileSync, copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parseEnv } from 'node:util';
 
 const root = resolve(import.meta.dirname, '..');
 const noDocker = process.argv.includes('--no-docker') || process.env.SKIP_DOCKER === '1';
@@ -27,12 +29,31 @@ if (major < 24) fail(`Node.js 24 or newer is required (found ${process.versions.
 console.log(`Node.js ${process.versions.node}`);
 
 step('Preparing .env');
-if (existsSync(resolve(root, '.env'))) {
-  console.log('.env already exists — keeping it');
+const envPath = resolve(root, '.env');
+const examplePath = resolve(root, '.env.example');
+if (existsSync(envPath)) {
+  // Add keys introduced since this .env was created; never change existing values.
+  const current = parseEnv(readFileSync(envPath, 'utf8'));
+  const missing = readFileSync(examplePath, 'utf8')
+    .split(/\r?\n/)
+    .filter((line) => /^[A-Z0-9_]+=/.test(line) && !(line.split('=')[0] in current));
+  if (missing.length) {
+    appendFileSync(envPath, `\n# Added by npm run setup\n${missing.join('\n')}\n`);
+    console.log(`Added new keys to .env: ${missing.map((l) => l.split('=')[0]).join(', ')}`);
+  } else {
+    console.log('.env already exists and is up to date');
+  }
 } else {
-  copyFileSync(resolve(root, '.env.example'), resolve(root, '.env'));
+  copyFileSync(examplePath, envPath);
   console.log('Created .env from .env.example');
 }
+// Replace placeholder secrets with random values (each one different).
+const envText = readFileSync(envPath, 'utf8');
+const withSecrets = envText.replace(/^([A-Z0-9_]+)=change-me-[^\r\n]*$/gm, (_, key) => {
+  console.log(`Generated a random ${key}`);
+  return `${key}=${randomBytes(48).toString('base64url')}`;
+});
+if (withSecrets !== envText) writeFileSync(envPath, withSecrets);
 
 step('Installing dependencies');
 run('npm install');

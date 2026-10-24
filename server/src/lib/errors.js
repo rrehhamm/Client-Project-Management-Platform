@@ -5,12 +5,14 @@ import { ZodError } from 'zod';
 
 /** An expected error with a status code. Throw these from services and middleware. */
 export class AppError extends Error {
-  constructor(status, code, message, fields = []) {
+  constructor(status, code, message, fields = [], headers = undefined) {
     super(message);
     this.name = 'AppError';
     this.status = status;
     this.code = code;
     this.fields = fields;
+    /** Extra response headers, e.g. Retry-After */
+    this.headers = headers;
   }
 }
 
@@ -28,6 +30,8 @@ export const staleUpdate = (message = 'This item was changed by someone else') =
   new AppError(409, ERROR_CODES.STALE_UPDATE, message);
 export const validationError = (fields, message = 'Some fields are invalid') =>
   new AppError(422, ERROR_CODES.VALIDATION_ERROR, message, fields);
+/** 422 for one field, e.g. fieldError('current_password', 'Current password is incorrect') */
+export const fieldError = (field, message) => validationError([{ field, message }], message);
 
 /** Zod issues → fields[] entries: { field: "a.b", message }. */
 export function zodToFields(error) {
@@ -63,6 +67,7 @@ export function errorHandler(err, req, res, _next) {
   const known = toAppError(err);
   if (known) {
     if (known.status >= 500) req.log?.error({ err }, known.message);
+    if (known.headers) res.set(known.headers);
     return res.status(known.status).json({ code: known.code, message: known.message, fields: known.fields });
   }
   req.log?.error({ err }, 'Unhandled error');

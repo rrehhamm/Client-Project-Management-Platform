@@ -37,7 +37,19 @@ const schema = z.object({
   SMTP_PASS: z.string().optional().default(''),
   MAIL_FROM: z.string().min(3),
 
-  BCRYPT_COST: z.coerce.number().int().min(12, 'BCRYPT_COST must be at least 12 (BR-AUTH-02)').default(12),
+  BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
+
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  CSRF_SECRET: z.string().min(32, 'CSRF_SECRET must be at least 32 characters'),
+  // Secure cookies need HTTPS; browsers treat http://localhost as secure too.
+  COOKIE_SECURE: z
+    .enum(['true', 'false', '1', '0'])
+    .default('true')
+    .transform((v) => v === 'true' || v === '1'),
+  // NFR-SEC-06 / FR-AUTH-11
+  AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+  API_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
 });
 
 function parseTrustProxy(value) {
@@ -55,6 +67,20 @@ function load() {
     throw new Error(`Invalid configuration (check .env against .env.example):\n${lines.join('\n')}`);
   }
   const env = result.data;
+
+  // BR-AUTH-02: cost 12 or more everywhere except the test suite, where a low cost
+  // keeps hundreds of password checks fast.
+  if (env.NODE_ENV !== 'test' && env.BCRYPT_COST < 12) {
+    throw new Error('Invalid configuration: BCRYPT_COST must be at least 12 (BR-AUTH-02)');
+  }
+  const secrets = [env.JWT_ACCESS_SECRET, env.JWT_REFRESH_SECRET, env.CSRF_SECRET];
+  if (new Set(secrets).size !== secrets.length) {
+    throw new Error('Invalid configuration: JWT_ACCESS_SECRET, JWT_REFRESH_SECRET and CSRF_SECRET must all differ');
+  }
+  if (env.NODE_ENV === 'production' && secrets.some((s) => s.includes('change-me'))) {
+    throw new Error('Invalid configuration: replace the placeholder secrets before running in production');
+  }
+
   return Object.freeze({
     env: env.NODE_ENV,
     isProduction: env.NODE_ENV === 'production',
@@ -83,6 +109,14 @@ function load() {
       from: env.MAIL_FROM,
     }),
     bcryptCost: env.BCRYPT_COST,
+    auth: Object.freeze({
+      accessSecret: new TextEncoder().encode(env.JWT_ACCESS_SECRET),
+      refreshSecret: new TextEncoder().encode(env.JWT_REFRESH_SECRET),
+      csrfSecret: env.CSRF_SECRET,
+      cookieSecure: env.COOKIE_SECURE,
+      authRateLimitPerMinute: env.AUTH_RATE_LIMIT_PER_MINUTE,
+      apiRateLimitPerMinute: env.API_RATE_LIMIT_PER_MINUTE,
+    }),
   });
 }
 

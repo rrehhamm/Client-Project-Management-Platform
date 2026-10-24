@@ -9,3 +9,8 @@ export function bigIntReplacer(_key, value) {
   }
   return Number(value);
 }
+
+/** Plain JSON copy (BigInt → number, Date → ISO string), e.g. for Json columns. */
+export function toPlainJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value, bigIntReplacer));
+}
