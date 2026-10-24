@@ -1,0 +1,17 @@
+// Error codes for the { code, message, fields[] } body (NFR-API-01).
+// The client switches on `code`, never on `message`.
+export const ERROR_CODES = Object.freeze({
+  BAD_REQUEST: 'BAD_REQUEST', // 400 malformed request (e.g. invalid JSON)
+  UNAUTHENTICATED: 'UNAUTHENTICATED', // 401
+  FORBIDDEN: 'FORBIDDEN', // 403
+  NOT_FOUND: 'NOT_FOUND', // 404
+  CONFLICT: 'CONFLICT', // 409 business-rule conflict / duplicate
+  TRANSITION_NOT_ALLOWED: 'TRANSITION_NOT_ALLOWED', // 409 (BRD 16)
+  STALE_UPDATE: 'STALE_UPDATE', // 409 (NFR-CONC-01)
+  PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE', // 413
+  UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE', // 415
+  VALIDATION_ERROR: 'VALIDATION_ERROR', // 422
+  RATE_LIMITED: 'RATE_LIMITED', // 429
+  INTERNAL_ERROR: 'INTERNAL_ERROR', // 500
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE', // 503
+});
