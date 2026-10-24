@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router';
 import { createQueryClient } from '@/api/queryClient';
+import { SessionExpiryListener } from '@/features/auth/guards';
 import { router } from '@/router';
 import './index.css';
 
@@ -11,6 +12,7 @@ const queryClient = createQueryClient();
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <SessionExpiryListener />
       <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,
