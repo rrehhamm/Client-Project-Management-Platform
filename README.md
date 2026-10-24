@@ -2,7 +2,7 @@
 
 One workspace where the agency runs clients, projects, tasks, time and billing, plus a branded portal where each client sees only its own work.
 
-The specification is [docs/BAD-BRD.pdf](docs/BAD-BRD.pdf). Every requirement has an ID (`FR-*`, `BR-*`, `NFR-*`, `TC-*`, `OD-*`). Code, commits and tests refer to those IDs. If the code and the BRD disagree, the BRD wins.
+The specification is [docs/BAD-BRD.pdf](docs/BAD-BRD.pdf). Every requirement has an ID (`FR-*`, `BR-*`, `NFR-*`, `TC-*`, `OD-*`). Code, commits and tests refer to those IDs. If the code and the BRD disagree, the BRD wins. Product Owner corrections, interpretations and deferred test cases are in [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Quick start
 
@@ -34,7 +34,7 @@ npm run dev     # API on :4000, app on :5173
 
 Projects: **NOV-001** E-Commerce Platform (Nova Retail, In Progress, Fixed 12,000 JOD, PM Lina, member Omar) and **BRI-001** Corporate Website (Bright Solutions, Not Started, Hourly, PM Lina, member Rana).
 
-Sign-in arrives in Phase 1. Until then the app shows a system status page.
+Internal users land on the dashboard; client contacts land on `/portal`. `/status` (no sign-in) shows whether the API, database, storage and mail are reachable. Invitation and password emails appear in Mailpit.
 
 ## Scripts
 
@@ -54,7 +54,7 @@ Run from the repo root.
 | `npm run db:seed -w server` | Load seed data (safe to re-run) |
 | `npm run db:studio -w server` | Browse the database in Prisma Studio |
 
-Server tests use a separate database (`TEST_DATABASE_URL`, must end in `_test`). Each run wipes it, migrates it and seeds it, so tests never touch your dev data.
+Server tests use a separate database (`TEST_DATABASE_URL`, must end in `_test`). Each run wipes it, migrates it and seeds it, so tests never touch your dev data. The test suite uses bcrypt cost 4 for speed; outside tests the server refuses a cost below 12. Playwright tests use the dev database and read invitation emails from Mailpit, so `npm run setup` must have run.
 
 ## Repository layout
 
@@ -76,7 +76,23 @@ scripts/setup.mjs  the setup command
 docs/              the BRD
 ```
 
+## Authentication and permissions
+
+- **Sessions.** Login sets two HttpOnly, SameSite=Lax cookies:
+  - `cpm_at`: a 15-minute access JWT.
+  - `cpm_rt`: a refresh JWT, sent only to `/api/v1/auth`.
+
+  The refresh token is replaced on every use, and reusing an old one revokes the session.
+- **Every request reloads the session and the person** from the database. So logout, deactivation, role changes and the 30-minute portal idle timeout take effect immediately.
+- **CSRF.** Every POST/PUT/PATCH/DELETE must send the `X-CSRF-Token` header, with the value of the `cpm_csrf` cookie (from `GET /api/v1/auth/csrf`). The client does this automatically ([client/src/api/client.js](client/src/api/client.js)).
+- **Permissions.** One place: [server/src/auth/permissions.js](server/src/auth/permissions.js) holds the BRD §4.2 matrix as data. `can(principal, action, ctx)` reads it, and routes call it through `authorize()` and `authorizeFields()` ([server/src/auth/authorize.js](server/src/auth/authorize.js)). Controllers never make their own permission decisions.
+  - Denied: 403, or 404 for client contacts when the record must stay hidden. Every denial is written to the audit log.
+  - Fields a role may not set: 403. Unknown fields: 422.
+- **Secure cookies on localhost.** `COOKIE_SECURE=true` works on http://localhost, because browsers treat localhost as secure. Tests set it to `false`.
+
 ## Conventions
+
+- **API shape.** REST JSON under `/api/v1`. Lists return `{ data, page, page_size, total }` (default 25, max 100). Every update of an editable record sends `version`; a stale one gets 409 `STALE_UPDATE`.
 
 - **Errors.** Every error response is `{ code, message, fields[] }` ([server/src/lib/errors.js](server/src/lib/errors.js), codes in [shared/src/errors.js](shared/src/errors.js)). Stack traces, SQL and secrets never leave the server.
 - **IDs.** Native Postgres `uuid`, time-ordered UUIDv7.
