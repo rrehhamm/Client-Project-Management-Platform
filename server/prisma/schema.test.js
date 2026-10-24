@@ -1,6 +1,7 @@
 // Checks the seed (BRD 19.1) and the database-level guards in the
 // constraints_and_triggers migration, against the real test database.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { config } from '../src/config.js';
 import { db } from '../src/lib/db.js';
 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -23,21 +24,28 @@ afterAll(async () => {
 
 describe('seed data (BRD 19.1)', () => {
   it('creates the six internal users with their roles', async () => {
-    const users = await db.user.findMany({ select: { email: true, role: true, status: true } });
-    expect(Object.fromEntries(users.map((u) => [u.email, u.role]))).toEqual({
+    const expected = {
       'owner@nexa.test': 'Owner',
       'admin@nexa.test': 'Admin',
       'lina.pm@nexa.test': 'PM',
       'omar@nexa.test': 'TeamMember',
       'rana@nexa.test': 'TeamMember',
       'sami.fin@nexa.test': 'Finance',
+    };
+    // Other test files add users of their own; only the seeded ones are checked here.
+    const users = await db.user.findMany({
+      where: { email: { in: Object.keys(expected) } },
+      select: { email: true, role: true, status: true },
     });
+    expect(Object.fromEntries(users.map((u) => [u.email, u.role]))).toEqual(expected);
     expect(users.every((u) => u.status === 'Active')).toBe(true);
   });
 
-  it('stores passwords only as bcrypt hashes with cost >= 12 (BR-AUTH-02)', async () => {
+  it('stores passwords only as bcrypt hashes at the configured cost (BR-AUTH-02)', async () => {
+    // Outside tests config.js refuses a cost below 12; the suite runs at 4 for speed.
     const u = await db.user.findUniqueOrThrow({ where: { email: 'omar@nexa.test' } });
-    expect(u.password_hash).toMatch(/^\$2[aby]\$1[2-9]\$/);
+    const cost = String(config.bcryptCost).padStart(2, '0');
+    expect(u.password_hash.startsWith('$2b$' + cost + '$')).toBe(true);
   });
 
   it('creates Project A: Nova Retail, In Progress, Fixed 12,000 JOD, PM Lina, member Omar', async () => {
