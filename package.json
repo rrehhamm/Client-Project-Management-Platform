@@ -1,0 +1,38 @@
+{
+  "name": "client-project-management-platform",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Agency workspace for clients, projects, tasks, time and billing, plus a branded client portal.",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "concurrently -k -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "lint": "eslint .",
+    "test": "npm run test -w shared && npm run test -w server && npm run test -w client",
+    "test:e2e": "npm run test:e2e -w client",
+    "build": "npm run build -w client",
+    "services:up": "docker compose up -d --wait",
+    "services:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "concurrently": "10.0.6",
+    "eslint": "10.13.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "globals": "17.13.0"
+  },
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true
+  }
+}
