@@ -99,6 +99,11 @@ export async function getProjectDetail(viewer, project) {
         delete: can(viewer, 'project.delete', ctx),
         manage_members: can(viewer, 'projectMember.manage', ctx),
         manage_milestones: can(viewer, 'milestone.update', ctx),
+        create_task: can(viewer, 'task.create', ctx),
+        manage_tasks: can(viewer, 'task.assignOthers', ctx), // PM/Admin/Owner: reorder, bulk, assign anyone
+        assign_self: can(viewer, 'task.assignSelf', ctx),
+        save_template: can(viewer, 'template.save', ctx),
+        duplicate: can(viewer, 'project.duplicate', ctx),
       },
     },
   });

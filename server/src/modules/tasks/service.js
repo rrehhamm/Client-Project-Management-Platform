@@ -466,7 +466,7 @@ export async function myTasks(viewer) {
     const key = !due ? 'later' : due < today ? 'overdue' : due === today ? 'today' : due <= weekEnd ? 'this_week' : 'later';
     groups[key].push(t);
   }
-  const out = { today, week_end: weekEnd };
+  const out = { as_of: today, week_end: weekEnd }; // "today" is also a group name
   for (const [key, list] of Object.entries(groups)) {
     out[key] = {
       total: list.length,

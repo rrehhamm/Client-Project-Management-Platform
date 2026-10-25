@@ -170,6 +170,9 @@ function capabilitiesFor(principal) {
     create_projects: can(principal, 'project.create'),
     delete_projects: can(principal, 'project.delete'),
     view_financials: can(principal, 'project.viewFinancials'),
+    my_tasks: can(principal, 'self.internalApp'),
+    list_templates: can(principal, 'template.list'),
+    manage_templates: can(principal, 'template.manage'),
   };
 }
 

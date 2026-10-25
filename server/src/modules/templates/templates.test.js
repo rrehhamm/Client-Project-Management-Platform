@@ -140,3 +140,12 @@ describe('duplicate project (FR-PRJ-12)', () => {
     expect((await as.TeamMember.post(`/api/v1/projects/${source.id}/duplicate`, { name: 'Mine' })).status).toBe(403);
   });
 });
+
+describe('project permissions shown to the UI', () => {
+  it('the project tells each role what it may do with tasks and templates', async () => {
+    const pm = (await as.PM.get(`/api/v1/projects/${source.id}`)).body.permissions;
+    expect(pm).toMatchObject({ create_task: true, manage_tasks: true, assign_self: true, save_template: true, duplicate: true });
+    const member = (await as.TeamMember.get(`/api/v1/projects/${source.id}`)).body.permissions;
+    expect(member).toMatchObject({ create_task: true, manage_tasks: false, assign_self: true, save_template: false, duplicate: false });
+  });
+});
