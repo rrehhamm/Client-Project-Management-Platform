@@ -98,7 +98,9 @@ docs/              the BRD
 | Team (internal users) | `server/src/modules/users`, `client/src/features/team` |
 | Workspace settings and logo | `server/src/modules/workspace`, `client/src/features/settings` |
 | Clients and contacts | `server/src/modules/clients`, `client/src/features/clients` |
-| Projects, members, milestones, activity | `server/src/modules/projects`, `client/src/features/projects` |
+| Projects, members, milestones, activity, duplicate | `server/src/modules/projects`, `client/src/features/projects` |
+| Tasks: list / board / calendar, subtasks, checklists, dependencies, bulk, My Tasks | `server/src/modules/tasks`, `client/src/features/tasks` |
+| Project templates | `server/src/modules/templates`, `client/src/features/templates` |
 | Nightly jobs (purge projects deleted > 30 days ago) | `server/src/jobs` (node-cron, 03:15 UTC) |
 
 ## Conventions

@@ -26,7 +26,7 @@ The BRD ([BAD-BRD.pdf](BAD-BRD.pdf)) is the source of truth. This file records e
 | D-20 | A milestone's **Overdue** is computed when read (due date before today in the workspace timezone and not Completed), never stored. The `Overdue` enum value is unused. Same approach as the project and task overdue flags. | FR-MS-02 | 2026-10-25 |
 | D-21 | The **workspace currency is locked** once any user rate or time entry exists (409 with a clear message), because rates are stored in the workspace currency (D-04). | FR-WS-01, D-04 | 2026-10-25 |
 | D-22 | Phase 2 assumptions, approved: the Leads pipeline (FR-CLI-07) moves to Phase 7 with proposals, and manual projects need an **Active** client; progress stays 0% until tasks exist (Phase 3); workspace logo is PNG or SVG ≤ 2 MB checked by content, SVGs with scripts or event handlers rejected, shown via signed URL; supported currencies stay JOD, USD, EUR (OD-09); a contact can be deleted only if they never signed in and have no project membership or history (otherwise 409, turn off portal access instead). | FR-CLI-07, FR-PRJ-07, FR-WS-01, FR-CON | 2026-10-25 |
-| D-23 | **Task status moves.** Open statuses (To Do, In Progress, In Review, Blocked) can move in any direction (board drag; TC-TSK-006). The dependency rule (FR-TSK-07) applies whenever a task leaves To Do for In Progress / In Review. **Done** from any open status except Blocked, with the subtask rule (BR-TSK-02). **Cancelled** from any open status. **Reopen** (Done/Cancelled → To Do) only by PM, Admin or Owner. **Assignees may mark their own tasks Done** (relaxes §16.2 "In Review → Done: PM"). | FR-TSK-06, §16.2 | 2026-10-25 |
+| D-23 | **Task status moves.** Open statuses (To Do, In Progress, In Review, Blocked) can move in any direction (board drag; TC-TSK-006). The dependency rule (FR-TSK-07) applies whenever a task leaves To Do for In Progress, In Review **or Done** (a blocked task cannot skip straight to Done). **Done** from any open status except Blocked, with the subtask rule (BR-TSK-02). **Cancelled** from any open status. **Reopen** (Done/Cancelled → To Do) only by PM, Admin or Owner. **Assignees may mark their own tasks Done** (relaxes §16.2 "In Review → Done: PM"). | FR-TSK-06, §16.2 | 2026-10-25 |
 | D-24 | **Team Member task edits.** On tasks assigned to them: status, checklist, description, their own estimate (BR-TSK-05). On tasks they created: also title, priority, dates and labels. Never: visibility, milestone, billable flag, or other people's assignment. They may **add** themselves as assignee on a task in their project; they may **remove** themselves only from tasks they created or self-assigned — not from a task someone else assigned them to (only PM/Admin/Owner reassign). | BR-TSK-05, §4.2 Tasks | 2026-10-25 |
 | D-25 | **Task views.** Calendar (month grid by due date) in Phase 3; Gantt/timeline (FR-TSK-09 "S") in Phase 6 with the workload view. | FR-TSK-09 | 2026-10-25 |
 | D-26 | **Templates.** PMs who are members of the project, plus Owner/Admin, can save a project as a template. Templates copy milestones, tasks with relative dates, subtasks, checklists, default members **and task dependencies**, never assignees, comments, files or time. **Duplicate project (FR-PRJ-12)** is built in Phase 3 on the same copy logic. | FR-PRJ-02/03/12 | 2026-10-25 |
@@ -63,6 +63,13 @@ Tax is taken on the already-rounded line subtotal, as agreed in D-15.
 
 None open. I-01…I-05 were answered on 2026-10-25 and are now D-13, D-14, D-11, D-16 and D-15. (IDs D-09 and D-10 were placeholders for I-01/I-02 and are not used.)
 
+## Behaviour choices made in Phase 3
+
+- A **Completed or Cancelled project** (as well as an archived one) is read-only for tasks: any task change answers 409 "Reopen the project first". On Hold projects still accept task changes.
+- `GET /me/tasks` groups open tasks into overdue / today / this_week / later; the reference date is `as_of` ("today" is a group name).
+- In the List view, drag-to-reorder is offered to PM/Admin/Owner and only when no filter is active (a filtered list hides siblings, so the new position would be unclear).
+- The board also has a status menu on each card, so status changes work by keyboard and screen reader (NFR-A11Y-01).
+
 ## Engineering requests
 
 | ID | Request | Status |
@@ -79,12 +86,14 @@ Covered now at the `can()` level (unit tests in `server/src/auth/can.test.js`). 
 | ~~TC-ROLE-002~~ | Lina demoted to Team Member → creating a project gets 403 | **Done in Phase 2** (`projects.test.js`) | — |
 | ~~TC-ROLE-003~~ | Team Member `POST /api/v1/projects` → 403, no record | **Done in Phase 2** | — |
 | ~~TC-ROLE-004~~ | Team Member `DELETE /api/v1/projects/{A}` → 403 | **Done in Phase 2** | — |
-| TC-ROLE-005 | Team Member PATCH task with `visibility` and `project_id` → ignored or 403, DB unchanged | `can()` test; field-level mechanism tested on `/users` | Phase 3 |
+| ~~TC-ROLE-005~~ | Team Member PATCH task with `visibility` and `project_id` → ignored or 403, DB unchanged | **Done in Phase 3** (`tasks.test.js`: 403, DB unchanged) | — |
 | TC-ROLE-006 | Team Member `GET /api/v1/invoices` → 403 | `can()` test | Phase 7 |
-| TC-USER-002 (part) | Deactivated user's open tasks keep the assignee and show "Assignee inactive" | Deactivation, sign-out and "not assignable" tested now | Phase 3 |
+| ~~TC-USER-002 (part)~~ | Deactivated user's open tasks keep the assignee and show "Assignee inactive" | **Done in Phase 3** (`tasks.test.js`) | — |
 | ~~TC-AUTH-003 (page)~~ | Signed-out `GET /projects` page → `/login?next=/projects` | **Done in Phase 2** (Playwright `projects.spec.js`) | — |
-| FR-PRJ-02/03 | Project templates | — (D-18) | Phase 3 |
-| FR-PRJ-07 (live) | Progress recalculated on every task status change | Calculation built and used on reopen | Phase 3 |
+| ~~FR-PRJ-02/03~~ | Project templates | **Done in Phase 3** (`templates.test.js`, Playwright `tasks.spec.js`) | — |
+| ~~FR-PRJ-07 (live)~~ | Progress recalculated on every task status change | **Done in Phase 3** (`tasks.test.js`) | — |
+| FR-TSK-09 (Gantt) | Gantt/timeline view | Calendar view built (D-25) | Phase 6 |
+| FR-TSK-02/05 (notify) | Assignees notified when assigned or when a task changes | Changes logged in the activity feed now | Phase 4 |
 | FR-PRJ-06 (notify) | Status change notified to members | Change logged now | Phase 4 |
 | FR-PRJ-11 (files) | Purge also removes stored files of purged projects | Database rows purged now | Phase 4 |
 | E2E-05 | Unauthorised attempts recorded in the audit log | Denials are audited (`access.denied`), tested on `/users` | Phase 4 |
