@@ -123,6 +123,7 @@ async function main() {
           workspace_id: ws,
           client_id: client.id,
           portal_access: true,
+          commercial_authority: ct.is_primary, // D-16
           status: 'Active',
           password_hash: await bcrypt.hash(password, config.bcryptCost),
           ...audit,
@@ -156,7 +157,10 @@ async function main() {
     // Keep the per-client code counter ahead of seeded codes (next is NOV-002, TC-PRJ-001)
     const used = Number(p.code.split('-')[1]);
     if (client.next_project_number <= used) {
-      await db.client.update({ where: { id: client.id }, data: { next_project_number: used + 1 } });
+      await db.client.update({
+        where: { id: client.id },
+        data: { next_project_number: used + 1, code_prefix_locked_at: client.code_prefix_locked_at ?? new Date() }, // D-02
+      });
       client.next_project_number = used + 1;
     }
 

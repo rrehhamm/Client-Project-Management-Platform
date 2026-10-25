@@ -338,33 +338,35 @@ model User {
 // ---------------------------------------------------------------------------
 
 model Client {
-  id                  String       @id @default(uuid(7)) @db.Uuid
-  workspace_id        String       @db.Uuid
-  name                String       @db.VarChar(120)
+  id                    String       @id @default(uuid(7)) @db.Uuid
+  workspace_id          String       @db.Uuid
+  name                  String       @db.VarChar(120)
   /// lower(trim(name)) — FR-CLI-01 case-insensitive uniqueness
-  name_normalized     String       @db.VarChar(120)
+  name_normalized       String       @db.VarChar(120)
   /// 3 uppercase letters used in project codes, e.g. NOV → NOV-001 (FR-PRJ-01).
   /// If taken, another unique prefix is suggested (e.g. NVR). Editable by Admin/PM
   /// only until the client's first project exists, then locked (DECISIONS.md D-02).
-  code_prefix         String       @db.Char(3)
+  code_prefix           String       @db.Char(3)
   /// Per-client counter for project codes
-  next_project_number Int          @default(1)
-  status              ClientStatus @default(Active)
-  industry            String?      @db.VarChar(120)
-  website             String?      @db.VarChar(2048)
-  billing_address     String?
-  tax_id              String?      @db.VarChar(64)
-  currency            String       @db.Char(3)
-  default_bill_rate   BigInt?
-  payment_terms_days  Int          @default(30)
+  next_project_number   Int          @default(1)
+  /// D-02: set when the first project is created; the prefix cannot change after
+  code_prefix_locked_at DateTime?    @db.Timestamptz(3)
+  status                ClientStatus @default(Active)
+  industry              String?      @db.VarChar(120)
+  website               String?      @db.VarChar(2048)
+  billing_address       String?
+  tax_id                String?      @db.VarChar(64)
+  currency              String       @db.Char(3)
+  default_bill_rate     BigInt?
+  payment_terms_days    Int          @default(30)
   /// FR-CLI-08: internal roles only, never returned by portal APIs
-  internal_notes      String?
-  archived_at         DateTime?    @db.Timestamptz(3)
-  created_at          DateTime     @default(now()) @db.Timestamptz(3)
-  created_by          String?      @db.Uuid
-  updated_at          DateTime     @updatedAt @db.Timestamptz(3)
-  updated_by          String?      @db.Uuid
-  version             Int          @default(1)
+  internal_notes        String?
+  archived_at           DateTime?    @db.Timestamptz(3)
+  created_at            DateTime     @default(now()) @db.Timestamptz(3)
+  created_by            String?      @db.Uuid
+  updated_at            DateTime     @updatedAt @db.Timestamptz(3)
+  updated_by            String?      @db.Uuid
+  version               Int          @default(1)
 
   workspace Workspace       @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
   contacts  ClientContact[]
@@ -381,27 +383,30 @@ model Client {
 
 /// A person at a client company; may log into the portal (BRD 4.1).
 model ClientContact {
-  id            String        @id @default(uuid(7)) @db.Uuid
-  workspace_id  String        @db.Uuid
+  id                   String        @id @default(uuid(7)) @db.Uuid
+  workspace_id         String        @db.Uuid
   /// BR-ROLE-06: a contact belongs to exactly one client, never moved
-  client_id     String        @db.Uuid
-  full_name     String        @db.VarChar(120)
+  client_id            String        @db.Uuid
+  full_name            String        @db.VarChar(120)
   /// Lowercased + trimmed; unique platform-wide and vs users (trigger)
-  email         String        @unique @db.VarChar(254)
-  phone         String?       @db.VarChar(40)
-  job_title     String?       @db.VarChar(120)
-  portal_access Boolean       @default(false)
-  status        ContactStatus @default(NotInvited)
-  is_primary    Boolean       @default(false)
-  password_hash String?       @db.VarChar(255)
+  email                String        @unique @db.VarChar(254)
+  phone                String?       @db.VarChar(40)
+  job_title            String?       @db.VarChar(120)
+  portal_access        Boolean       @default(false)
+  status               ContactStatus @default(NotInvited)
+  is_primary           Boolean       @default(false)
+  /// D-16: may accept proposals, sign contracts and pay invoices for the client.
+  /// The primary contact gets it by default; Owner/Admin/PM can change it.
+  commercial_authority Boolean       @default(false)
+  password_hash        String?       @db.VarChar(255)
   /// Personal display timezone; null = workspace timezone (FR-AUTH-13)
-  timezone      String?       @db.VarChar(64)
-  last_login_at DateTime?     @db.Timestamptz(3)
-  created_at    DateTime      @default(now()) @db.Timestamptz(3)
-  created_by    String?       @db.Uuid
-  updated_at    DateTime      @updatedAt @db.Timestamptz(3)
-  updated_by    String?       @db.Uuid
-  version       Int           @default(1)
+  timezone             String?       @db.VarChar(64)
+  last_login_at        DateTime?     @db.Timestamptz(3)
+  created_at           DateTime      @default(now()) @db.Timestamptz(3)
+  created_by           String?       @db.Uuid
+  updated_at           DateTime      @updatedAt @db.Timestamptz(3)
+  updated_by           String?       @db.Uuid
+  version              Int           @default(1)
 
   workspace           Workspace           @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
   client              Client              @relation(fields: [client_id], references: [id], onDelete: Restrict)
@@ -454,7 +459,9 @@ model Project {
   completed_at           DateTime?     @db.Timestamptz(3)
   /// Archived is a flag on Completed/Cancelled projects, not a status (BRD 16.1)
   archived_at            DateTime?     @db.Timestamptz(3)
+  archived_by            String?       @db.Uuid
   deleted_at             DateTime?     @db.Timestamptz(3)
+  deleted_by             String?       @db.Uuid
   created_at             DateTime      @default(now()) @db.Timestamptz(3)
   created_by             String?       @db.Uuid
   updated_at             DateTime      @updatedAt @db.Timestamptz(3)
