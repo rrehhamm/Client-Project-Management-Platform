@@ -10,6 +10,8 @@ const Clients = load(() => import('@/features/clients/ClientsPage'), 'ClientsPag
 const ClientDetail = load(() => import('@/features/clients/ClientDetailPage'), 'ClientDetailPage');
 const Projects = load(() => import('@/features/projects/ProjectsPage'), 'ProjectsPage');
 const ProjectDetail = load(() => import('@/features/projects/ProjectDetailPage'), 'ProjectDetailPage');
+const MyTasks = load(() => import('@/features/tasks/MyTasksPage'), 'MyTasksPage');
+const Templates = load(() => import('@/features/templates/TemplatesPage'), 'TemplatesPage');
 const WorkspaceSettings = load(() => import('@/features/settings/WorkspaceSettingsPage'), 'WorkspaceSettingsPage');
 
 const fallback = <LoadingState rows={5} />;
@@ -47,5 +49,15 @@ export const ProjectDetailPage = () => (
 export const WorkspaceSettingsPage = () => (
   <Suspense fallback={fallback}>
     <WorkspaceSettings />
+  </Suspense>
+);
+export const MyTasksPage = () => (
+  <Suspense fallback={fallback}>
+    <MyTasks />
+  </Suspense>
+);
+export const TemplatesPage = () => (
+  <Suspense fallback={fallback}>
+    <Templates />
   </Suspense>
 );

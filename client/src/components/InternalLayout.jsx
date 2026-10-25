@@ -22,8 +22,10 @@ export function InternalLayout() {
 
   const items = [
     { to: '/', label: t('nav.dashboard'), end: true, show: true },
+    { to: '/my-tasks', label: t('nav.myTasks'), show: caps.my_tasks },
     { to: '/clients', label: t('nav.clients'), show: caps.view_clients },
     { to: '/projects', label: t('nav.projects'), show: caps.list_projects },
+    { to: '/templates', label: t('nav.templates'), show: caps.list_templates },
     { to: '/team', label: t('nav.team'), show: caps.manage_team },
     { to: '/settings', label: t('nav.settings'), show: caps.manage_workspace },
   ].filter((i) => i.show);

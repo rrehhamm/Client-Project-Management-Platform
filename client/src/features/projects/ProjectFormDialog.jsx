@@ -1,4 +1,4 @@
-// FR-PRJ-01: create a project. PM picker lists active PMs, Admins and Owners (D-19).
+// FR-PRJ-01: create a project, optionally from a template (FR-PRJ-03). PM picker lists active PMs, Admins and Owners (D-19).
 import { zodResolver } from '@hookform/resolvers/zod';
 import { BILLING_TYPE } from '@cpm/shared';
 import { useForm, useWatch } from 'react-hook-form';
@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { applyFieldErrors } from '@/api/client';
 import { useClients } from '@/api/clients';
 import { useCreateProject } from '@/api/projects';
+import { useTemplates } from '@/api/templates';
 import { useUsers } from '@/api/users';
 import { FormField } from '@/components/FormField';
 import { Alert } from '@/components/ui/alert';
@@ -24,6 +25,7 @@ export function ProjectFormDialog({ me, clientId, onOpenChange, onSaved }) {
   const clients = useClients({ status: 'Active', page_size: 100, sort: 'name', order: 'asc' });
   const users = useUsers({ assignable: true, page_size: 100 });
   const pms = (users.data?.data ?? []).filter((u) => PM_ROLES.includes(u.role));
+  const templates = useTemplates({ enabled: Boolean(me.capabilities.list_templates) });
 
   const schema = z
     .object({
@@ -37,6 +39,7 @@ export function ProjectFormDialog({ me, clientId, onOpenChange, onSaved }) {
       budget_amount: z.string(),
       budget_hours: z.string().regex(/^(\d+(\.\d+)?)?$/, 'Enter a number of hours'),
       portal_enabled: z.boolean(),
+      template_id: z.string(),
     })
     .refine((v) => !v.due_date || v.due_date >= v.start_date, { path: ['due_date'], message: 'Due date cannot be before start date' });
 
@@ -53,6 +56,7 @@ export function ProjectFormDialog({ me, clientId, onOpenChange, onSaved }) {
       budget_amount: '',
       budget_hours: '',
       portal_enabled: false,
+      template_id: '',
     },
   });
 
@@ -78,6 +82,7 @@ export function ProjectFormDialog({ me, clientId, onOpenChange, onSaved }) {
         budget_amount: textToMinor(v.budget_amount, currency),
         budget_minutes: v.budget_hours ? Math.round(Number(v.budget_hours) * 60) : null,
         portal_enabled: v.portal_enabled,
+        ...(v.template_id ? { template_id: v.template_id } : {}),
       },
       {
         onSuccess: (p) => {
@@ -152,6 +157,20 @@ export function ProjectFormDialog({ me, clientId, onOpenChange, onSaved }) {
               <Input inputMode="decimal" {...register('budget_amount')} />
             </FormField>
           )}
+          {templates.data?.data.length ? (
+            <div className="sm:col-span-2">
+              <FormField label={t('templates.startFrom')} error={formState.errors.template_id?.message}>
+                <Select {...register('template_id')}>
+                  <option value="">{t('templates.none')}</option>
+                  {templates.data.data.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
             <FormField label={t('projects.form.description')}>
               <Textarea rows={3} {...register('description')} />

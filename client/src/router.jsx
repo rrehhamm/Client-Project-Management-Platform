@@ -18,9 +18,11 @@ import {
   AccountPage,
   ClientDetailPage,
   ClientsPage,
+  MyTasksPage,
   ProjectDetailPage,
   ProjectsPage,
   TeamPage,
+  TemplatesPage,
   WorkspaceSettingsPage,
 } from '@/lazyPages';
 
@@ -64,6 +66,8 @@ export const routes = [
               { path: '/clients/:id', element: gated('view_clients', <ClientDetailPage />) },
               { path: '/projects', element: gated('list_projects', <ProjectsPage />) },
               { path: '/projects/:id', element: gated('list_projects', <ProjectDetailPage />) },
+              { path: '/my-tasks', element: gated('my_tasks', <MyTasksPage />) },
+              { path: '/templates', element: gated('list_templates', <TemplatesPage />) },
               { path: '/team', element: gated('manage_team', <TeamPage />) },
               { path: '/settings', element: gated('manage_workspace', <WorkspaceSettingsPage />) },
               { path: '/account', element: <AccountPage /> },

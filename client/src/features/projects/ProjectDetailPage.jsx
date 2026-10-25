@@ -1,4 +1,4 @@
-// FR-PRJ-08: project overview, plus milestones, members, activity and settings.
+// FR-PRJ-08: project overview, plus tasks, milestones, members, activity and settings.
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMe } from '@/api/auth';
@@ -20,11 +20,13 @@ import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { t } from '@/i18n';
 import { formatDate, formatMoney } from '@/lib/format';
 import { useTabParam } from '@/lib/useTabParam';
+import { TasksTab } from '@/features/tasks/TasksTab';
+import { DuplicateProjectDialog, SaveTemplateDialog } from '@/features/templates/ProjectTemplateDialogs';
 import { MembersTab } from './MembersTab';
 import { MilestonesTab } from './MilestonesTab';
 import { ProjectSettingsForm } from './ProjectSettingsForm';
 
-const TABS = ['overview', 'milestones', 'members', 'activity', 'settings'];
+const TABS = ['overview', 'tasks', 'milestones', 'members', 'activity', 'settings'];
 
 /** Button label for a status change (BRD 16.1). */
 function transitionLabel(from, to) {
@@ -165,6 +167,7 @@ export function ProjectDetailPage() {
   const [pendingStatus, setPendingStatus] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [templateDialog, setTemplateDialog] = useState(null); // 'save' | 'duplicate'
 
   if (query.isPending) return <LoadingState rows={6} />;
   if (query.error) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
@@ -195,16 +198,26 @@ export function ProjectDetailPage() {
           </div>
         }
         actions={
-          canUpdate ? (
+          canUpdate || p.permissions.save_template || p.permissions.duplicate ? (
             <>
-              {!archived
+              {p.permissions.save_template ? (
+                <Button variant="outline" onClick={() => setTemplateDialog('save')}>
+                  {t('templates.saveAs')}
+                </Button>
+              ) : null}
+              {p.permissions.duplicate ? (
+                <Button variant="outline" onClick={() => setTemplateDialog('duplicate')}>
+                  {t('templates.duplicate')}
+                </Button>
+              ) : null}
+              {canUpdate && !archived
                 ? p.allowed_transitions.map((s) => (
                     <Button key={s} variant={s === 'Cancelled' ? 'outline' : 'secondary'} onClick={() => setPendingStatus(s)}>
                       {transitionLabel(p.status, s)}
                     </Button>
                   ))
                 : null}
-              {['Completed', 'Cancelled'].includes(p.status) ? (
+              {canUpdate && ['Completed', 'Cancelled'].includes(p.status) ? (
                 <Button
                   variant="outline"
                   onClick={() =>
@@ -259,6 +272,7 @@ export function ProjectDetailPage() {
       <Tabs tabs={visibleTabs.map((x) => ({ id: x, label: t(`projects.tabs.${x}`) }))} value={activeTab} onChange={setTab} label={p.name} />
       <TabPanel label={t(`projects.tabs.${activeTab}`)}>
         {activeTab === 'overview' ? <Overview project={p} me={me} /> : null}
+        {activeTab === 'tasks' ? <TasksTab project={p} /> : null}
         {activeTab === 'milestones' ? <MilestonesTab project={p} dateFormat={df} /> : null}
         {activeTab === 'members' ? <MembersTab project={p} /> : null}
         {activeTab === 'activity' ? <ProjectActivity project={p} me={me} /> : null}
@@ -282,6 +296,10 @@ export function ProjectDetailPage() {
           )
         }
       />
+      {templateDialog === 'save' ? <SaveTemplateDialog project={p} onOpenChange={() => setTemplateDialog(null)} onSaved={setNotice} /> : null}
+      {templateDialog === 'duplicate' ? (
+        <DuplicateProjectDialog project={p} onOpenChange={() => setTemplateDialog(null)} onDone={(copy) => { setTemplateDialog(null); navigate(`/projects/${copy.id}`); }} />
+      ) : null}
       {deleting ? <DeleteDialog project={p} onOpenChange={setDeleting} onDeleted={() => navigate('/projects', { replace: true })} /> : null}
     </div>
   );
