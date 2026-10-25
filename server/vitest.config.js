@@ -27,6 +27,8 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       DATABASE_URL: process.env.TEST_DATABASE_URL ?? '',
+      // Uploads from tests never land in the dev bucket
+      S3_BUCKET: `${process.env.S3_BUCKET ?? 'cpm-files'}-test`,
       // Low bcrypt cost keeps hundreds of password checks fast (allowed in test only).
       BCRYPT_COST: '4',
       // Supertest talks plain HTTP, so cookies must not carry the Secure flag here.

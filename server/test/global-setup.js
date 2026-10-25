@@ -21,8 +21,16 @@ export default async function setup() {
   await client.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
   await client.end();
 
-  const env = { ...process.env, DATABASE_URL: url, NODE_ENV: 'test', BCRYPT_COST: '4' };
+  const env = {
+    ...process.env,
+    DATABASE_URL: url,
+    NODE_ENV: 'test',
+    BCRYPT_COST: '4',
+    S3_BUCKET: `${process.env.S3_BUCKET ?? 'cpm-files'}-test`, // same as vitest.config.js
+  };
   const run = (cmd) => execSync(cmd, { cwd: serverDir, env, stdio: 'pipe' });
   run('npx prisma migrate deploy');
   run('node prisma/seed.js');
+  // Storage tests (workspace logo) need the bucket; create it if missing.
+  run('node scripts/init-storage.js');
 }
