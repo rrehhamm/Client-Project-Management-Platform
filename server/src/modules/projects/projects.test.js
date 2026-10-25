@@ -3,7 +3,8 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { SEED, apiCreateClient, apiCreateProject, auditEntries, client, createUser, loginAs } from '../../../test/helpers.js';
+import { apiCreateClient, apiCreateProject, auditEntries, client, loginAs } from '../../../test/helpers.js';
+import { createWorld } from '../../../test/fixtures.js';
 
 vi.mock('../../lib/mailer.js', () => ({ sendMail: vi.fn().mockResolvedValue({}), pingMail: vi.fn() }));
 
@@ -12,6 +13,7 @@ const { db } = await import('../../lib/db.js');
 const { purgeDeletedProjects } = await import('../../jobs/purgeDeletedProjects.js');
 
 const app = createApp();
+let W; // E-01: this file's own workspace
 const as = {};
 let nova;
 let bright;
@@ -21,16 +23,15 @@ let projectA;
 let projectB;
 
 beforeAll(async () => {
-  for (const [role, email] of Object.entries({ Owner: SEED.owner, Admin: SEED.admin, PM: SEED.pm, TeamMember: SEED.member, TeamMember2: SEED.member2, Finance: SEED.finance, Contact: SEED.contact })) {
-    as[role] = await loginAs(app, email);
-  }
+  W = await createWorld('Projects');
+  Object.assign(as, await W.loginAll(app));
   as.Anonymous = await client(app);
-  nova = await db.client.findFirstOrThrow({ where: { name_normalized: 'nova retail' } });
-  bright = await db.client.findFirstOrThrow({ where: { name_normalized: 'bright solutions' } });
-  lina = await db.user.findUniqueOrThrow({ where: { email: SEED.pm } });
-  omar = await db.user.findUniqueOrThrow({ where: { email: SEED.member } });
-  projectA = await db.project.findFirstOrThrow({ where: { code: 'NOV-001' } });
-  projectB = await db.project.findFirstOrThrow({ where: { code: 'BRI-001' } });
+  nova = W.clients.nova;
+  bright = W.clients.bright;
+  lina = W.users.pm;
+  omar = W.users.member;
+  projectA = W.projects.A;
+  projectB = W.projects.B;
 });
 
 const base = () => ({ name: `Project ${randomUUID().slice(0, 8)}`, start_date: '2026-10-01', billing_type: 'Fixed' });
@@ -52,7 +53,7 @@ describe('create (FR-PRJ-01)', () => {
   it('the creator becomes a member when someone else is the PM', async () => {
     const res = await as.Admin.post('/api/v1/projects', { ...base(), client_id: nova.id, pm_user_id: lina.id });
     const roles = (await db.projectMember.findMany({ where: { project_id: res.body.id }, include: { user: true } })).map((m) => [m.user.email, m.project_role]);
-    expect(roles).toEqual(expect.arrayContaining([[SEED.pm, 'PM'], [SEED.admin, 'Member']]));
+    expect(roles).toEqual(expect.arrayContaining([[W.users.pm.email, 'PM'], [W.users.admin.email, 'Member']]));
   });
 
   it('TC-PRJ-002: due date before start date → 422, no record', async () => {
@@ -64,15 +65,15 @@ describe('create (FR-PRJ-01)', () => {
   });
 
   it('TC-PRJ-003: a blank name → 422, no record', async () => {
-    const before = await db.project.count();
+    const before = await db.project.count({ where: { workspace_id: W.workspace.id } });
     const res = await as.PM.post('/api/v1/projects', { ...base(), name: '  ', client_id: nova.id, pm_user_id: lina.id });
     expect(res.status).toBe(422);
-    expect(await db.project.count()).toBe(before);
+    expect(await db.project.count({ where: { workspace_id: W.workspace.id } })).toBe(before);
   });
 
   it('BR-PRJ-01 / D-12: names are unique per client, case-insensitive; another client may reuse it', async () => {
     const name = `Shared Name ${randomUUID().slice(0, 6)}`;
-    await apiCreateProject(as.Admin, { clientId: nova.id, name });
+    await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id, name });
     const dup = await as.Admin.post('/api/v1/projects', { ...base(), name: name.toUpperCase(), client_id: nova.id, pm_user_id: lina.id });
     expect(dup.status).toBe(409);
     expect((await as.Admin.post('/api/v1/projects', { ...base(), name, client_id: bright.id, pm_user_id: lina.id })).status).toBe(201);
@@ -82,9 +83,9 @@ describe('create (FR-PRJ-01)', () => {
     const tm = await as.Admin.post('/api/v1/projects', { ...base(), client_id: nova.id, pm_user_id: omar.id });
     expect(tm.status).toBe(422);
     expect(tm.body.fields[0].field).toBe('pm_user_id');
-    const inactive = await createUser({ role: 'PM', status: 'Deactivated' });
+    const inactive = await W.addUser({ role: 'PM', status: 'Deactivated' });
     expect((await as.Admin.post('/api/v1/projects', { ...base(), client_id: nova.id, pm_user_id: inactive.id })).status).toBe(422);
-    const admin = await db.user.findUniqueOrThrow({ where: { email: SEED.admin } });
+    const admin = W.users.admin;
     expect((await as.Admin.post('/api/v1/projects', { ...base(), client_id: nova.id, pm_user_id: admin.id })).status).toBe(201);
   });
 
@@ -116,7 +117,7 @@ describe('create (FR-PRJ-01)', () => {
   });
 
   it('TC-ROLE-002: Lina-style PM demoted to Team Member gets 403 creating a project on the next request', async () => {
-    const pm = await createUser({ role: 'PM' });
+    const pm = await W.addUser({ role: 'PM' });
     const pmClient = await loginAs(app, pm.email);
     expect((await pmClient.post('/api/v1/projects', { ...base(), client_id: nova.id, pm_user_id: pm.id })).status).toBe(201);
     const fresh = await db.user.findUniqueOrThrow({ where: { id: pm.id } });
@@ -153,7 +154,7 @@ describe('read and list (FR-PRJ-08, FR-PRJ-09, BR-CLI-01, BR-PRJ-04)', () => {
   });
 
   it('a PM who is not a member cannot read the project', async () => {
-    const other = await createUser({ role: 'PM' });
+    const other = await W.addUser({ role: 'PM' });
     const c = await loginAs(app, other.email);
     expect((await c.get(`/api/v1/projects/${projectA.id}`)).status).toBe(403);
   });
@@ -167,7 +168,7 @@ describe('read and list (FR-PRJ-08, FR-PRJ-09, BR-CLI-01, BR-PRJ-04)', () => {
     expect(page.body.data).toHaveLength(2);
     expect(page.body.total).toBeGreaterThan(2);
 
-    const late = await apiCreateProject(as.Admin, { clientId: nova.id, start_date: '2025-01-01', due_date: '2025-02-01' });
+    const late = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id, start_date: '2025-01-01', due_date: '2025-02-01' });
     const overdue = (await as.Admin.get('/api/v1/projects?overdue=true&page_size=100')).body.data;
     expect(overdue.map((p) => p.id)).toContain(late.id);
     expect(overdue.find((p) => p.id === late.id).is_overdue).toBe(true);
@@ -184,7 +185,7 @@ describe('read and list (FR-PRJ-08, FR-PRJ-09, BR-CLI-01, BR-PRJ-04)', () => {
 // ---------------------------------------------------------------------------
 describe('edit (FR-PRJ-04) and PM change (FR-PRJ-05)', () => {
   it('edits fields with optimistic locking and audits before/after', async () => {
-    const p = await apiCreateProject(as.PM, { clientId: nova.id });
+    const p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
     const res = await as.PM.patch(`/api/v1/projects/${p.id}`, { due_date: '2026-12-31', budget_amount: 5000, version: p.version });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ due_date: '2026-12-31', budget_amount: 5000 });
@@ -194,20 +195,20 @@ describe('edit (FR-PRJ-04) and PM change (FR-PRJ-05)', () => {
   });
 
   it('BR-PRJ-02 also applies when only one date changes', async () => {
-    const p = await apiCreateProject(as.PM, { clientId: nova.id, start_date: '2026-11-10' });
+    const p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id, start_date: '2026-11-10' });
     expect((await as.PM.patch(`/api/v1/projects/${p.id}`, { due_date: '2026-11-01', version: p.version })).status).toBe(422);
   });
 
   it('TC-PRJ-007: the client cannot change once time entries exist', async () => {
-    const p = await apiCreateProject(as.Admin, { clientId: nova.id });
+    const p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     await db.timeEntry.create({ data: { workspace_id: nova.workspace_id, user_id: lina.id, project_id: p.id, date: new Date('2026-10-02'), duration_minutes: 60, is_billable: true } });
     const res = await as.Admin.patch(`/api/v1/projects/${p.id}`, { client_id: bright.id, version: p.version });
     expect(res.status).toBe(409);
   });
 
   it('changing the PM keeps the old PM as a member and makes the new one PM', async () => {
-    const p = await apiCreateProject(as.Admin, { clientId: nova.id });
-    const admin = await db.user.findUniqueOrThrow({ where: { email: SEED.admin } });
+    const p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
+    const admin = W.users.admin;
     const res = await as.Admin.patch(`/api/v1/projects/${p.id}`, { pm_user_id: admin.id, version: p.version });
     expect(res.status).toBe(200);
     const roles = Object.fromEntries((await db.projectMember.findMany({ where: { project_id: p.id } })).map((m) => [m.user_id, m.project_role]));
@@ -221,7 +222,7 @@ describe('status lifecycle (FR-PRJ-06, BRD 16.1, BR-PRJ-03, BR-PRJ-05)', () => {
   const setStatus = (c, p, status) => c.post(`/api/v1/projects/${p.id}/status`, { status, version: p.version });
 
   it('follows the allowed transitions and rejects the rest with 409 "Transition not allowed"', async () => {
-    let p = await apiCreateProject(as.PM, { clientId: nova.id });
+    let p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
     const skip = await setStatus(as.PM, p, 'Completed');
     expect(skip.status).toBe(409);
     expect(skip.body).toMatchObject({ code: 'TRANSITION_NOT_ALLOWED', message: 'Transition not allowed' });
@@ -239,7 +240,7 @@ describe('status lifecycle (FR-PRJ-06, BRD 16.1, BR-PRJ-03, BR-PRJ-05)', () => {
   });
 
   it('TC-PRJ-005: Completed with one open task → 409 listing the task', async () => {
-    let p = await apiCreateProject(as.PM, { clientId: nova.id });
+    let p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
     p = (await setStatus(as.PM, p, 'InProgress')).body;
     await db.task.create({ data: { workspace_id: nova.workspace_id, project_id: p.id, title: 'Write copy' } });
     const res = await setStatus(as.PM, p, 'Completed');
@@ -248,7 +249,7 @@ describe('status lifecycle (FR-PRJ-06, BRD 16.1, BR-PRJ-03, BR-PRJ-05)', () => {
   });
 
   it('Completed also needs every milestone completed', async () => {
-    let p = await apiCreateProject(as.PM, { clientId: nova.id });
+    let p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
     p = (await setStatus(as.PM, p, 'InProgress')).body;
     await as.PM.post(`/api/v1/projects/${p.id}/milestones`, { title: 'Launch', due_date: '2026-12-01' });
     const res = await setStatus(as.PM, p, 'Completed');
@@ -265,13 +266,13 @@ describe('status lifecycle (FR-PRJ-06, BRD 16.1, BR-PRJ-03, BR-PRJ-05)', () => {
 // ---------------------------------------------------------------------------
 describe('archive, delete, restore, purge (FR-PRJ-10, FR-PRJ-11)', () => {
   async function completedProject() {
-    let p = await apiCreateProject(as.Admin, { clientId: nova.id });
+    let p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     for (const s of ['InProgress', 'Completed']) p = (await as.Admin.post(`/api/v1/projects/${p.id}/status`, { status: s, version: p.version })).body;
     return p;
   }
 
   it('only Completed or Cancelled projects can be archived; archived projects are read-only and hidden', async () => {
-    const open = await apiCreateProject(as.Admin, { clientId: nova.id });
+    const open = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     expect((await as.Admin.post(`/api/v1/projects/${open.id}/archive`)).status).toBe(409);
 
     const p = await completedProject();
@@ -292,7 +293,7 @@ describe('archive, delete, restore, purge (FR-PRJ-10, FR-PRJ-11)', () => {
   });
 
   it('TC-PRJ-006: deleting a project with time entries → 409 suggesting Archive', async () => {
-    const p = await apiCreateProject(as.Admin, { clientId: nova.id });
+    const p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     await db.timeEntry.create({ data: { workspace_id: nova.workspace_id, user_id: lina.id, project_id: p.id, date: new Date('2026-10-02'), duration_minutes: 30, is_billable: false } });
     const res = await as.Admin.delete(`/api/v1/projects/${p.id}`).send({ confirm_name: p.name });
     expect(res.status).toBe(409);
@@ -300,7 +301,7 @@ describe('archive, delete, restore, purge (FR-PRJ-10, FR-PRJ-11)', () => {
   });
 
   it('needs the typed name, soft-deletes, shows in the trash, restores within 30 days', async () => {
-    const p = await apiCreateProject(as.Admin, { clientId: nova.id });
+    const p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     expect((await as.Admin.delete(`/api/v1/projects/${p.id}`).send({ confirm_name: 'wrong' })).status).toBe(422);
     expect((await as.Admin.delete(`/api/v1/projects/${p.id}`).send({ confirm_name: p.name })).status).toBe(204);
     expect((await as.Admin.get(`/api/v1/projects/${p.id}`)).status).toBe(404);
@@ -313,15 +314,15 @@ describe('archive, delete, restore, purge (FR-PRJ-10, FR-PRJ-11)', () => {
   });
 
   it('a deleted project frees its name; restoring it then conflicts', async () => {
-    const p = await apiCreateProject(as.Admin, { clientId: nova.id });
+    const p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     await as.Admin.delete(`/api/v1/projects/${p.id}`).send({ confirm_name: p.name });
-    await apiCreateProject(as.Admin, { clientId: nova.id, name: p.name });
+    await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id, name: p.name });
     expect((await as.Admin.post(`/api/v1/projects/${p.id}/restore`)).status).toBe(409);
   });
 
   it('the nightly job removes projects deleted more than 30 days ago and keeps newer ones', async () => {
-    const old = await apiCreateProject(as.Admin, { clientId: nova.id });
-    const recent = await apiCreateProject(as.Admin, { clientId: nova.id });
+    const old = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
+    const recent = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id });
     for (const p of [old, recent]) await as.Admin.delete(`/api/v1/projects/${p.id}`).send({ confirm_name: p.name });
     await db.project.update({ where: { id: old.id }, data: { deleted_at: new Date(Date.now() - 31 * 86_400_000) } });
     expect((await as.Admin.post(`/api/v1/projects/${old.id}/restore`)).status).toBe(409); // too late
@@ -336,7 +337,7 @@ describe('archive, delete, restore, purge (FR-PRJ-10, FR-PRJ-11)', () => {
 // ---------------------------------------------------------------------------
 describe('members (FR-PRJ-05, D-14, BR-ROLE-07)', () => {
   it('TC-PRJ-008: adding Omar twice keeps one membership', async () => {
-    const p = await apiCreateProject(as.PM, { clientId: nova.id });
+    const p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
     const first = await as.PM.post(`/api/v1/projects/${p.id}/members`, { user_id: omar.id });
     const second = await as.PM.post(`/api/v1/projects/${p.id}/members`, { user_id: omar.id });
     expect([first.status, second.status]).toEqual([201, 200]);
@@ -344,8 +345,8 @@ describe('members (FR-PRJ-05, D-14, BR-ROLE-07)', () => {
   });
 
   it("D-14: a PM who is a member but not the project's PM cannot manage members", async () => {
-    const p = await apiCreateProject(as.Admin, { clientId: nova.id }); // PM is Lina
-    const otherPm = await createUser({ role: 'PM' });
+    const p = await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: nova.id }); // PM is Lina
+    const otherPm = await W.addUser({ role: 'PM' });
     await as.Admin.post(`/api/v1/projects/${p.id}/members`, { user_id: otherPm.id });
     const c = await loginAs(app, otherPm.email);
     expect((await c.get(`/api/v1/projects/${p.id}`)).status).toBe(200);
@@ -354,20 +355,20 @@ describe('members (FR-PRJ-05, D-14, BR-ROLE-07)', () => {
   });
 
   it('contacts join with a portal level (default View) and must belong to the project client', async () => {
-    const p = await apiCreateProject(as.PM, { clientId: nova.id });
-    const maya = await db.clientContact.findUniqueOrThrow({ where: { email: SEED.contact } });
+    const p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
+    const maya = W.contacts.maya;
     const added = await as.PM.post(`/api/v1/projects/${p.id}/members`, { contact_id: maya.id });
     expect(added.body).toMatchObject({ kind: 'contact', portal_level: 'View' });
     const changed = await as.PM.patch(`/api/v1/projects/${p.id}/members/${added.body.id}`, { portal_level: 'Approve' });
     expect(changed.body.portal_level).toBe('Approve');
-    const brightContact = await db.clientContact.findUniqueOrThrow({ where: { email: 'omar.n@bright.test' } });
+    const brightContact = W.contacts.omarN;
     expect((await as.PM.post(`/api/v1/projects/${p.id}/members`, { contact_id: brightContact.id })).status).toBe(422);
     expect((await as.PM.post(`/api/v1/projects/${p.id}/members`, { user_id: omar.id, portal_level: 'View' })).status).toBe(422);
   });
 
   it('BR-ROLE-07: removing a member removes access on the next request; the PM cannot be removed', async () => {
-    const p = await apiCreateProject(as.PM, { clientId: nova.id });
-    const rana = await db.user.findUniqueOrThrow({ where: { email: SEED.member2 } });
+    const p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
+    const rana = W.users.member2;
     const m = (await as.PM.post(`/api/v1/projects/${p.id}/members`, { user_id: rana.id })).body;
     expect((await as.TeamMember2.get(`/api/v1/projects/${p.id}`)).status).toBe(200);
     expect((await as.PM.delete(`/api/v1/projects/${p.id}/members/${m.id}`)).status).toBe(204);
@@ -389,7 +390,7 @@ describe('members (FR-PRJ-05, D-14, BR-ROLE-07)', () => {
 // ---------------------------------------------------------------------------
 describe('activity feed (FR-PRJ-08)', () => {
   it('lists project events newest first with actor names; Team Members see non-finance events', async () => {
-    const p = await apiCreateProject(as.PM, { clientId: nova.id });
+    const p = await apiCreateProject(as.PM, { pmId: W.users.pm.id, clientId: nova.id });
     await as.PM.post(`/api/v1/projects/${p.id}/status`, { status: 'InProgress', version: p.version });
     await as.PM.post(`/api/v1/projects/${p.id}/members`, { user_id: omar.id });
     const feed = await as.TeamMember.get(`/api/v1/projects/${p.id}/activity`);

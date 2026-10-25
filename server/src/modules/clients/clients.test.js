@@ -2,7 +2,8 @@
 // BR-ROLE-05/06, D-02, D-16, D-22, TC-CLI-001…004.
 import request from 'supertest';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { SEED, SEED_PASSWORD, apiCreateClient, apiCreateProject, auditEntries, client, loginAs, uniqueClientName, uniqueEmail } from '../../../test/helpers.js';
+import { SEED_PASSWORD, apiCreateClient, apiCreateProject, auditEntries, client, loginAs, uniqueClientName, uniqueEmail } from '../../../test/helpers.js';
+import { createWorld } from '../../../test/fixtures.js';
 
 vi.mock('../../lib/mailer.js', () => ({ sendMail: vi.fn().mockResolvedValue({}), pingMail: vi.fn() }));
 
@@ -11,17 +12,17 @@ const { db } = await import('../../lib/db.js');
 const { prefixCandidates } = await import('./prefix.js');
 
 const app = createApp();
+let W; // E-01: this file's own workspace
 const as = {};
 let nova;
 let bright;
 
 beforeAll(async () => {
-  for (const [role, email] of Object.entries({ Owner: SEED.owner, Admin: SEED.admin, PM: SEED.pm, TeamMember: SEED.member, TeamMember2: SEED.member2, Finance: SEED.finance, Contact: SEED.contact })) {
-    as[role] = await loginAs(app, email);
-  }
+  W = await createWorld('Clients');
+  Object.assign(as, await W.loginAll(app));
   as.Anonymous = await client(app);
-  nova = await db.client.findFirstOrThrow({ where: { name_normalized: 'nova retail' } });
-  bright = await db.client.findFirstOrThrow({ where: { name_normalized: 'bright solutions' } });
+  nova = W.clients.nova;
+  bright = W.clients.bright;
 });
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,7 @@ describe('project-code prefix (D-02)', () => {
     const changed = await as.Admin.patch(`/api/v1/clients/${c.id}`, { code_prefix: free, version: c.version });
     expect([200, 409]).toContain(changed.status); // 409 only if the random prefix is taken
     const fresh = (await as.Admin.get(`/api/v1/clients/${c.id}`)).body;
-    await apiCreateProject(as.Admin, { clientId: c.id });
+    await apiCreateProject(as.Admin, { pmId: W.users.pm.id, clientId: c.id });
     const after = (await as.Admin.get(`/api/v1/clients/${c.id}`)).body;
     expect(after.code_prefix_locked).toBe(true);
     const locked = await as.Admin.patch(`/api/v1/clients/${c.id}`, { code_prefix: 'ZZZ', version: after.version });
@@ -116,7 +117,7 @@ describe('list and detail (FR-CLI-03, FR-CLI-04, FR-CLI-08, BR-CLI-03)', () => {
   it('lists name, status, primary contact, active projects and outstanding balance', async () => {
     const res = await as.Admin.get('/api/v1/clients?q=nova%20retail');
     const row = res.body.data.find((c) => c.id === nova.id);
-    expect(row).toMatchObject({ status: 'Active', primary_contact: { email: SEED.contact }, active_projects: 1, outstanding_balance: 0 });
+    expect(row).toMatchObject({ status: 'Active', primary_contact: { email: W.contacts.maya.email }, active_projects: 1, outstanding_balance: 0 });
     expect(res.body).toMatchObject({ page: 1, page_size: 25 });
   });
 
@@ -172,7 +173,7 @@ describe('archive, restore, delete (FR-CLI-05, FR-CLI-06, BR-CLI-04)', () => {
     try {
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('Archived');
-      const login = await (await client(app)).post('/api/v1/auth/login', { email: 'omar.n@bright.test', password: SEED_PASSWORD });
+      const login = await (await client(app)).post('/api/v1/auth/login', { email: W.contacts.omarN.email, password: SEED_PASSWORD });
       expect(login.status).toBe(403);
       expect(login.body.message).toBe('Portal access is disabled');
       // hidden from the default list (pickers), shown when asked for
@@ -195,7 +196,7 @@ describe('archive, restore, delete (FR-CLI-05, FR-CLI-06, BR-CLI-04)', () => {
   it('archiving signs out its contacts immediately', async () => {
     const c = await apiCreateClient(as.Admin);
     const contact = (await as.Admin.post(`/api/v1/clients/${c.id}/contacts`, { full_name: 'Portal Person', email: uniqueEmail('portal') })).body;
-    await db.clientContact.update({ where: { id: contact.id }, data: { portal_access: true, status: 'Active', password_hash: (await db.user.findUniqueOrThrow({ where: { email: SEED.admin } })).password_hash } });
+    await db.clientContact.update({ where: { id: contact.id }, data: { portal_access: true, status: 'Active', password_hash: (W.users.admin).password_hash } });
     const session = await loginAs(app, contact.email);
     await as.Admin.post(`/api/v1/clients/${c.id}/archive`);
     expect((await session.get('/api/v1/auth/me')).status).toBe(401);
@@ -292,19 +293,19 @@ describe('contacts (FR-CON-01, FR-CON-02, D-16, D-22, BR-ROLE-05/06)', () => {
 
   it('emails are unique across contacts and internal users (FR-CON-01, BR-ROLE-05)', async () => {
     const c = await apiCreateClient(as.PM);
-    expect((await as.PM.post(`/api/v1/clients/${c.id}/contacts`, { full_name: 'X', email: SEED.member })).status).toBe(409);
-    expect((await as.PM.post(`/api/v1/clients/${c.id}/contacts`, { full_name: 'X', email: SEED.contact })).status).toBe(409);
+    expect((await as.PM.post(`/api/v1/clients/${c.id}/contacts`, { full_name: 'X', email: W.users.member.email })).status).toBe(409);
+    expect((await as.PM.post(`/api/v1/clients/${c.id}/contacts`, { full_name: 'X', email: W.contacts.maya.email })).status).toBe(409);
   });
 
   it('BR-ROLE-06: a contact cannot be moved to another client', async () => {
-    const maya = await db.clientContact.findUniqueOrThrow({ where: { email: SEED.contact } });
+    const maya = W.contacts.maya;
     const res = await as.Admin.patch(`/api/v1/contacts/${maya.id}`, { client_id: bright.id, version: maya.version });
     expect(res.status).toBe(422);
     expect((await db.clientContact.findUniqueOrThrow({ where: { id: maya.id } })).client_id).toBe(nova.id);
   });
 
   it('D-22: only contacts without history can be deleted; the primary only when it is the last one', async () => {
-    const maya = await db.clientContact.findUniqueOrThrow({ where: { email: SEED.contact } });
+    const maya = W.contacts.maya;
     const withHistory = await as.Admin.delete(`/api/v1/contacts/${maya.id}`);
     expect(withHistory.status).toBe(409);
     expect(withHistory.body.message).toMatch(/portal access/);

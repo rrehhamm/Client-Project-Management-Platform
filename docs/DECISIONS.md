@@ -26,6 +26,12 @@ The BRD ([BAD-BRD.pdf](BAD-BRD.pdf)) is the source of truth. This file records e
 | D-20 | A milestone's **Overdue** is computed when read (due date before today in the workspace timezone and not Completed), never stored. The `Overdue` enum value is unused. Same approach as the project and task overdue flags. | FR-MS-02 | 2026-10-25 |
 | D-21 | The **workspace currency is locked** once any user rate or time entry exists (409 with a clear message), because rates are stored in the workspace currency (D-04). | FR-WS-01, D-04 | 2026-10-25 |
 | D-22 | Phase 2 assumptions, approved: the Leads pipeline (FR-CLI-07) moves to Phase 7 with proposals, and manual projects need an **Active** client; progress stays 0% until tasks exist (Phase 3); workspace logo is PNG or SVG ≤ 2 MB checked by content, SVGs with scripts or event handlers rejected, shown via signed URL; supported currencies stay JOD, USD, EUR (OD-09); a contact can be deleted only if they never signed in and have no project membership or history (otherwise 409, turn off portal access instead). | FR-CLI-07, FR-PRJ-07, FR-WS-01, FR-CON | 2026-10-25 |
+| D-23 | **Task status moves.** Open statuses (To Do, In Progress, In Review, Blocked) can move in any direction (board drag; TC-TSK-006). The dependency rule (FR-TSK-07) applies whenever a task leaves To Do for In Progress / In Review. **Done** from any open status except Blocked, with the subtask rule (BR-TSK-02). **Cancelled** from any open status. **Reopen** (Done/Cancelled → To Do) only by PM, Admin or Owner. **Assignees may mark their own tasks Done** (relaxes §16.2 "In Review → Done: PM"). | FR-TSK-06, §16.2 | 2026-10-25 |
+| D-24 | **Team Member task edits.** On tasks assigned to them: status, checklist, description, their own estimate (BR-TSK-05). On tasks they created: also title, priority, dates and labels. Never: visibility, milestone, billable flag, or other people's assignment. They may **add** themselves as assignee on a task in their project; they may **remove** themselves only from tasks they created or self-assigned — not from a task someone else assigned them to (only PM/Admin/Owner reassign). | BR-TSK-05, §4.2 Tasks | 2026-10-25 |
+| D-25 | **Task views.** Calendar (month grid by due date) in Phase 3; Gantt/timeline (FR-TSK-09 "S") in Phase 6 with the workload view. | FR-TSK-09 | 2026-10-25 |
+| D-26 | **Templates.** PMs who are members of the project, plus Owner/Admin, can save a project as a template. Templates copy milestones, tasks with relative dates, subtasks, checklists, default members **and task dependencies**, never assignees, comments, files or time. **Duplicate project (FR-PRJ-12)** is built in Phase 3 on the same copy logic. | FR-PRJ-02/03/12 | 2026-10-25 |
+| D-27 | **Moving a task** to another project of the same client (BR-TSK-04): subtasks move with it; it loses milestone and dependencies; assignees who aren't members of the target project are removed and listed in the response. | BR-TSK-04 | 2026-10-25 |
+| D-28 | Phase 3 assumptions, approved: recurring tasks (FR-TSK-08) and custom fields (FR-TSK-15) at the end of the build; tasks are soft-deleted with no restore screen for now; dependencies link tasks of the same project only. | FR-TSK-08/13/15, FR-TSK-07 | 2026-10-25 |
 
 ### Updated test case: TC-INV-001 (D-03)
 
@@ -61,7 +67,7 @@ None open. I-01…I-05 were answered on 2026-10-25 and are now D-13, D-14, D-11,
 
 | ID | Request | Status |
 |---|---|---|
-| E-01 | API test files must not depend on running in a fixed order against one shared database. Each file creates its own data, so files can run in any order or in parallel. (Requested 2026-10-25 after Phase 2; today files run in path order, see `server/vitest.config.js`.) | Planned at the start of Phase 3 |
+| E-01 | API test files must not depend on running in a fixed order against one shared database. Each file creates its own data, so files can run in any order or in parallel. (Requested 2026-10-25 after Phase 2.) | **Done in Phase 3**: each file builds its own workspace (`server/test/fixtures.js`); files run in parallel and shuffled. Only `prisma/schema.test.js` reads the seed. |
 | E-02 | Bundle size: no further splitting needed for now (main bundle ~565 KB / 177 KB gzip). | Closed 2026-10-25 |
 
 ## Deferred test cases

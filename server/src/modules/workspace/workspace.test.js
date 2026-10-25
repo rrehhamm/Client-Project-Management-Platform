@@ -1,7 +1,8 @@
 // API tests for workspace settings: FR-WS-01, D-17, D-21, D-22 (logo). Uses the
 // real S3-compatible storage from docker compose.
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { SEED, client, loginAs } from '../../../test/helpers.js';
+import { client } from '../../../test/helpers.js';
+import { createWorld } from '../../../test/fixtures.js';
 
 vi.mock('../../lib/mailer.js', () => ({ sendMail: vi.fn().mockResolvedValue({}), pingMail: vi.fn() }));
 
@@ -9,6 +10,7 @@ const { createApp } = await import('../../app.js');
 const { db } = await import('../../lib/db.js');
 
 const app = createApp();
+let W; // E-01: this file's own workspace
 const as = {};
 
 // 1×1 transparent PNG
@@ -18,14 +20,13 @@ const SVG = Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000
 const PUBLIC_FIELDS = ['brand_color', 'currency', 'date_format', 'id', 'logo_url', 'name', 'timezone', 'week_start_day'];
 
 beforeAll(async () => {
-  for (const [role, email] of Object.entries({ Owner: SEED.owner, Admin: SEED.admin, PM: SEED.pm, TeamMember: SEED.member, Finance: SEED.finance, Contact: SEED.contact })) {
-    as[role] = await loginAs(app, email);
-  }
+  W = await createWorld('Workspace');
+  Object.assign(as, await W.loginAll(app));
   as.Anonymous = await client(app);
 });
 
 const upload = (c, body, type) => c.agent.put('/api/v1/workspace/logo').set('X-CSRF-Token', c.csrf).set('Content-Type', type).send(body);
-const current = () => db.workspace.findFirstOrThrow({ where: { name: { not: '' } }, orderBy: { created_at: 'asc' } });
+const current = () => db.workspace.findUniqueOrThrow({ where: { id: W.workspace.id } });
 
 describe('GET /workspace (D-17)', () => {
   it('every signed-in principal reads the public fields; only Owner/Admin get admin fields', async () => {
@@ -35,7 +36,7 @@ describe('GET /workspace (D-17)', () => {
       expect(Object.keys(res.body).sort(), role).toEqual(PUBLIC_FIELDS);
     }
     const admin = await as.Admin.get('/api/v1/workspace');
-    expect(admin.body).toMatchObject({ name: 'Nexa', currency: 'JOD', invoice_prefix: 'INV-', currency_locked: expect.any(Boolean), version: expect.any(Number) });
+    expect(admin.body).toMatchObject({ name: W.workspace.name, currency: 'JOD', invoice_prefix: 'INV-', currency_locked: expect.any(Boolean), version: expect.any(Number) });
     expect((await as.Anonymous.get('/api/v1/workspace')).status).toBe(401);
   });
 });
@@ -47,7 +48,7 @@ describe('PATCH /workspace (FR-WS-01, D-21)', () => {
       expect((await as[role].patch('/api/v1/workspace', { name: 'Hacked', version: ws.version })).status, role).toBe(403);
     }
     expect((await as.Contact.patch('/api/v1/workspace', { name: 'Hacked', version: ws.version })).status).toBe(404);
-    expect((await current()).name).toBe('Nexa');
+    expect((await current()).name).toBe(W.workspace.name);
   });
 
   it('Admin changes brand colour, date format and week start; invalid values are 422; stale is 409', async () => {
@@ -63,7 +64,7 @@ describe('PATCH /workspace (FR-WS-01, D-21)', () => {
   });
 
   it('D-21: the currency is locked once a user rate exists', async () => {
-    const sami = await db.user.findUniqueOrThrow({ where: { email: SEED.finance } });
+    const sami = W.users.finance;
     await db.user.update({ where: { id: sami.id }, data: { hourly_cost_rate: 10_000n } });
     try {
       const ws = await current();

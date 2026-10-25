@@ -2,21 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { expect } from 'vitest';
-import { hashPassword } from '../src/auth/passwords.js';
 import { db } from '../src/lib/db.js';
 
 export const SEED_PASSWORD = process.env.SEED_PASSWORD;
-
-export const SEED = {
-  owner: 'owner@nexa.test',
-  admin: 'admin@nexa.test',
-  pm: 'lina.pm@nexa.test',
-  member: 'omar@nexa.test',
-  member2: 'rana@nexa.test',
-  finance: 'sami.fin@nexa.test',
-  contact: 'maya@novaretail.test',
-  contactView: 'ali@novaretail.test',
-};
 
 /**
  * A cookie-keeping client that sends the CSRF header on every request.
@@ -67,44 +55,7 @@ export async function loginAs(app, email, password = SEED_PASSWORD, extra = {}) 
   return c;
 }
 
-let workspaceId;
-export async function workspaceIdForTests() {
-  workspaceId ??= (await db.workspace.findFirstOrThrow({ where: { name: 'Nexa' } })).id;
-  return workspaceId;
-}
-
 export const uniqueEmail = (prefix = 'user') => `${prefix}-${randomUUID().slice(0, 8)}@nexa.test`;
-
-/** Create an internal user directly in the database. */
-export async function createUser({ role = 'TeamMember', status = 'Active', password = SEED_PASSWORD, email, fullName } = {}) {
-  return db.user.create({
-    data: {
-      workspace_id: await workspaceIdForTests(),
-      email: email ?? uniqueEmail(role.toLowerCase()),
-      full_name: fullName ?? `Test ${role}`,
-      role,
-      status,
-      password_hash: status === 'Invited' ? null : await hashPassword(password),
-    },
-  });
-}
-
-/** Create a client contact (on Nova Retail unless clientId is given). */
-export async function createContact({ clientId, portalAccess = true, status = 'Active', password = SEED_PASSWORD } = {}) {
-  const client =
-    clientId ?? (await db.client.findFirstOrThrow({ where: { name_normalized: 'nova retail' } })).id;
-  return db.clientContact.create({
-    data: {
-      workspace_id: await workspaceIdForTests(),
-      client_id: client,
-      full_name: 'Test Contact',
-      email: `contact-${randomUUID().slice(0, 8)}@novaretail.test`,
-      portal_access: portalAccess,
-      status,
-      password_hash: await hashPassword(password),
-    },
-  });
-}
 
 /** Unique client name / 3-letter prefix for tests that need their own client. */
 export function uniqueClientName(prefix = 'Client') {
@@ -118,15 +69,15 @@ export async function apiCreateClient(c, overrides = {}) {
   return res.body;
 }
 
-/** Create a project through the API. `pmId` defaults to Lina. */
+/** Create a project through the API. `pmId` is required (a PM of the caller's workspace). */
 export async function apiCreateProject(c, { clientId, pmId, ...overrides } = {}) {
-  const pm = pmId ?? (await db.user.findUniqueOrThrow({ where: { email: SEED.pm } })).id;
+  if (!pmId) throw new Error('apiCreateProject needs pmId');
   const res = await c.post('/api/v1/projects', {
     client_id: clientId,
     name: `Project ${randomUUID().slice(0, 8)}`,
     start_date: '2026-10-01',
     billing_type: 'Fixed',
-    pm_user_id: pm,
+    pm_user_id: pmId,
     ...overrides,
   });
   expect(res.status, JSON.stringify(res.body)).toBe(201);

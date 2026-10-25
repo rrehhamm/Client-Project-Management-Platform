@@ -3,15 +3,14 @@
 import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  SEED,
   SEED_PASSWORD,
   auditEntries,
   client,
-  createUser,
   loginAs,
   tokenFromLastMail,
   uniqueEmail,
 } from '../../../test/helpers.js';
+import { createWorld } from '../../../test/fixtures.js';
 
 vi.mock('../../lib/mailer.js', () => ({ sendMail: vi.fn().mockResolvedValue({}), pingMail: vi.fn() }));
 
@@ -20,18 +19,20 @@ const { createApp } = await import('../../app.js');
 const { db } = await import('../../lib/db.js');
 
 const app = createApp();
+let W; // E-01: this file's own workspace
 const as = {};
 let owner;
 
 beforeAll(async () => {
-  as.Owner = await loginAs(app, SEED.owner);
-  as.Admin = await loginAs(app, SEED.admin);
-  as.PM = await loginAs(app, SEED.pm);
-  as.TeamMember = await loginAs(app, SEED.member);
-  as.Finance = await loginAs(app, SEED.finance);
-  as.Contact = await loginAs(app, SEED.contact);
+  W = await createWorld('Users');
+  as.Owner = await loginAs(app, W.users.owner.email);
+  as.Admin = await loginAs(app, W.users.admin.email);
+  as.PM = await loginAs(app, W.users.pm.email);
+  as.TeamMember = await loginAs(app, W.users.member.email);
+  as.Finance = await loginAs(app, W.users.finance.email);
+  as.Contact = await loginAs(app, W.contacts.maya.email);
   as.Anonymous = await client(app);
-  owner = await db.user.findUniqueOrThrow({ where: { email: SEED.owner } });
+  owner = W.users.owner;
 });
 
 beforeEach(() => sendMail.mockClear());
@@ -52,7 +53,7 @@ async function expectDenied(roles, send) {
 describe('direct API calls by roles that must be denied (permission matrix 4.2)', () => {
   let victim;
   beforeAll(async () => {
-    victim = await createUser({ role: 'TeamMember' });
+    victim = await W.addUser({ role: 'TeamMember' });
   });
 
   it('GET /users: Team Member 403, contact 404, signed out 401', async () => {
@@ -126,7 +127,7 @@ describe('direct API calls by roles that must be denied (permission matrix 4.2)'
 
   it('denied attempts are written to the audit log (E2E-05)', async () => {
     await as.TeamMember.get('/api/v1/users');
-    const member = await db.user.findUniqueOrThrow({ where: { email: SEED.member } });
+    const member = W.users.member;
     const [entry] = await auditEntries('access.denied', { actor_id: member.id });
     expect(entry.after).toMatchObject({ permission: 'user.list', method: 'GET', path: '/api/v1/users' });
   });
@@ -143,7 +144,7 @@ describe('GET /users (FR-USER-03)', () => {
     const finance = await as.Admin.get('/api/v1/users?role=Finance');
     expect(finance.body.data.every((u) => u.role === 'Finance')).toBe(true);
     const search = await as.Admin.get('/api/v1/users?q=LINA');
-    expect(search.body.data.map((u) => u.email)).toContain(SEED.pm);
+    expect(search.body.data.map((u) => u.email)).toContain(W.users.pm.email);
   });
 
   it('caps page size at 100 (NFR-PERF-03)', async () => {
@@ -177,13 +178,13 @@ describe('invitations (FR-USER-01, FR-USER-02)', () => {
   });
 
   it('TC-USER-001: inviting an existing email → 409 "User already exists"', async () => {
-    const res = await as.Admin.post('/api/v1/users', { email: SEED.member, full_name: 'Dup', role: 'TeamMember' });
+    const res = await as.Admin.post('/api/v1/users', { email: W.users.member.email, full_name: 'Dup', role: 'TeamMember' });
     expect(res.status).toBe(409);
     expect(res.body.message).toBe('User already exists');
   });
 
   it("a client contact's email cannot become an internal user (BR-ROLE-05)", async () => {
-    const res = await as.Admin.post('/api/v1/users', { email: SEED.contact, full_name: 'Maya', role: 'TeamMember' });
+    const res = await as.Admin.post('/api/v1/users', { email: W.contacts.maya.email, full_name: 'Maya', role: 'TeamMember' });
     expect(res.status).toBe(409);
   });
 
@@ -211,7 +212,7 @@ describe('invitations (FR-USER-01, FR-USER-02)', () => {
   });
 
   it('only pending invitations can be resent or revoked', async () => {
-    const active = await createUser();
+    const active = await W.addUser();
     expect((await as.Admin.post(`/api/v1/users/${active.id}/invitation/resend`)).status).toBe(409);
     expect((await as.Admin.delete(`/api/v1/users/${active.id}/invitation`)).status).toBe(409);
   });
@@ -220,7 +221,7 @@ describe('invitations (FR-USER-01, FR-USER-02)', () => {
 // ---------------------------------------------------------------------------
 describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', () => {
   it('Admin changes a role; the change is audited with before/after', async () => {
-    const u = await createUser();
+    const u = await W.addUser();
     const res = await as.Admin.patch(`/api/v1/users/${u.id}`, { role: 'PM', version: u.version });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ role: 'PM', version: u.version + 1 });
@@ -229,7 +230,7 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
   });
 
   it('Finance sets rates (minor units); the response includes them for Finance', async () => {
-    const u = await createUser();
+    const u = await W.addUser();
     const res = await as.Finance.patch(`/api/v1/users/${u.id}`, { hourly_cost_rate: 15_000, default_bill_rate: 40_000, version: u.version });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ hourly_cost_rate: 15_000, default_bill_rate: 40_000 });
@@ -238,7 +239,7 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
   });
 
   it('a stale version gets 409 and nothing changes', async () => {
-    const u = await createUser();
+    const u = await W.addUser();
     await as.Admin.patch(`/api/v1/users/${u.id}`, { full_name: 'First', version: u.version });
     const stale = await as.Owner.patch(`/api/v1/users/${u.id}`, { full_name: 'Second', version: u.version });
     expect(stale.status).toBe(409);
@@ -247,7 +248,7 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
   });
 
   it('unknown or protected fields are rejected and the database is unchanged', async () => {
-    const u = await createUser();
+    const u = await W.addUser();
     for (const body of [{ status: 'Active' }, { email: 'x@nexa.test' }, { password_hash: 'x' }, { workspace_id: u.workspace_id }]) {
       const res = await as.Admin.patch(`/api/v1/users/${u.id}`, { ...body, version: u.version });
       expect(res.status).toBe(422);
@@ -256,7 +257,7 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
   });
 
   it('BR-ROLE-03: a user cannot change their own role', async () => {
-    const admin = await createUser({ role: 'Admin' });
+    const admin = await W.addUser({ role: 'Admin' });
     const c = await loginAs(app, admin.email);
     const res = await c.patch(`/api/v1/users/${admin.id}`, { role: 'PM', version: admin.version });
     expect(res.status).toBe(403);
@@ -271,7 +272,7 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
   });
 
   it('TC-ROLE-001: with the Owner as the only administrator, demoting or deactivating them → 409', async () => {
-    const otherAdmins = await db.user.findMany({ where: { role: 'Admin', status: 'Active' }, select: { id: true } });
+    const otherAdmins = await db.user.findMany({ where: { workspace_id: W.workspace.id, role: 'Admin', status: 'Active' }, select: { id: true } });
     const ids = otherAdmins.map((a) => a.id);
     await db.user.updateMany({ where: { id: { in: ids } }, data: { role: 'Finance' } });
     try {
@@ -289,13 +290,13 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
   });
 
   it('the last Admin besides the Owner can be demoted (the Owner remains an administrator)', async () => {
-    const admin = await createUser({ role: 'Admin' });
+    const admin = await W.addUser({ role: 'Admin' });
     const res = await as.Owner.patch(`/api/v1/users/${admin.id}`, { role: 'PM', version: admin.version });
     expect(res.status).toBe(200);
   });
 
   it('TC-ROLE-002 / BR-ROLE-04: a demoted PM loses PM rights on the very next request', async () => {
-    const pm = await createUser({ role: 'PM' });
+    const pm = await W.addUser({ role: 'PM' });
     const pmClient = await loginAs(app, pm.email);
     const before = await pmClient.post('/api/v1/users', { email: uniqueEmail('by-pm'), full_name: 'Ok', role: 'TeamMember' });
     expect(before.status).toBe(201);
@@ -314,7 +315,7 @@ describe('PATCH /users/:id (FR-USER-04, FR-USER-07, NFR-CONC-01, NFR-SEC-03)', (
 // ---------------------------------------------------------------------------
 describe('deactivate / reactivate (FR-USER-05, FR-USER-06)', () => {
   it('TC-USER-002: a deactivated user is signed out and no longer assignable; reactivating restores them', async () => {
-    const u = await createUser();
+    const u = await W.addUser();
     const session = await loginAs(app, u.email);
 
     const off = await as.Admin.post(`/api/v1/users/${u.id}/deactivate`);
@@ -336,11 +337,11 @@ describe('deactivate / reactivate (FR-USER-05, FR-USER-06)', () => {
   });
 
   it('cannot deactivate yourself, an invited user, or someone already deactivated', async () => {
-    const admin = await db.user.findUniqueOrThrow({ where: { email: SEED.admin } });
+    const admin = W.users.admin;
     expect((await as.Admin.post(`/api/v1/users/${admin.id}/deactivate`)).status).toBe(403);
-    const invited = await createUser({ status: 'Invited' });
+    const invited = await W.addUser({ status: 'Invited' });
     expect((await as.Admin.post(`/api/v1/users/${invited.id}/deactivate`)).status).toBe(409);
-    const gone = await createUser({ status: 'Deactivated' });
+    const gone = await W.addUser({ status: 'Deactivated' });
     expect((await as.Admin.post(`/api/v1/users/${gone.id}/deactivate`)).status).toBe(409);
     expect((await as.Admin.post(`/api/v1/users/${invited.id}/reactivate`)).status).toBe(409);
   });
@@ -355,8 +356,8 @@ describe('deactivate / reactivate (FR-USER-05, FR-USER-06)', () => {
 // ---------------------------------------------------------------------------
 describe('transfer ownership (BR-ROLE-01)', () => {
   it('needs the Owner password and an active Admin; swaps roles; can be transferred back', async () => {
-    const target = await createUser({ role: 'Admin' });
-    const tm = await createUser();
+    const target = await W.addUser({ role: 'Admin' });
+    const tm = await W.addUser();
 
     const wrongPw = await as.Owner.post(`/api/v1/users/${target.id}/transfer-ownership`, { password: 'Wrong-pass-123' });
     expect(wrongPw.status).toBe(422);
@@ -366,7 +367,7 @@ describe('transfer ownership (BR-ROLE-01)', () => {
     expect(ok.status).toBe(200);
     expect(await fresh(target.id)).toMatchObject({ role: 'Owner' });
     expect(await fresh(owner.id)).toMatchObject({ role: 'Admin' });
-    expect(await db.user.count({ where: { role: 'Owner' } })).toBe(1); // exactly one Owner
+    expect(await db.user.count({ where: { workspace_id: W.workspace.id, role: 'Owner' } })).toBe(1); // exactly one Owner
     const [entry] = await auditEntries('workspace.ownership_transferred');
     expect(entry.after).toEqual({ owner_id: target.id });
 
