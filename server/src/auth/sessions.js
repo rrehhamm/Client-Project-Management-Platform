@@ -43,6 +43,7 @@ export function toPrincipal(session) {
     status: c.status,
     client_id: c.client_id,
     client_name: c.client.name,
+    commercial_authority: c.commercial_authority, // D-16
     session_id: session.id,
   };
 }

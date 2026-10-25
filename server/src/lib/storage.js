@@ -2,8 +2,10 @@
 // URLs, generated only after the caller's permission check (FR-FILE-04).
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -22,15 +24,27 @@ export const s3 = new S3Client({
  * Signed GET URL for one object, valid SIGNED_URL_TTL_SECONDS (default 600 = 10 min).
  * Call this only after checking the user may read the file.
  */
-export function getDownloadUrl(key, { filename } = {}) {
+export function getDownloadUrl(key, { filename, inline = false } = {}) {
   const command = new GetObjectCommand({
     Bucket: storage.bucket,
     Key: key,
-    ResponseContentDisposition: filename
-      ? `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
-      : undefined,
+    ResponseContentDisposition: inline
+      ? 'inline'
+      : filename
+        ? `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+        : undefined,
   });
   return getSignedUrl(s3, command, { expiresIn: storage.signedUrlTtlSeconds });
+}
+
+/** Store one object. */
+export async function putObject(key, body, contentType) {
+  await s3.send(new PutObjectCommand({ Bucket: storage.bucket, Key: key, Body: body, ContentType: contentType }));
+}
+
+/** Remove one object (no error if it is already gone). */
+export async function deleteObject(key) {
+  await s3.send(new DeleteObjectCommand({ Bucket: storage.bucket, Key: key }));
 }
 
 /** Readiness probe: true when the bucket is reachable. */

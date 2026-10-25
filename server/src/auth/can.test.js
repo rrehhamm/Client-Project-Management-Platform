@@ -68,8 +68,9 @@ describe('can()', () => {
 });
 
 describe('workspace settings and users (4.2 rows 1–2)', () => {
-  it('workspace settings: Owner CRUD, Admin RU, others none', () => {
-    expectAllowed('workspace.read', {}, ['Owner', 'Admin']);
+  it('workspace settings: Owner CRUD, Admin RU; everyone reads the public fields (D-17)', () => {
+    expectAllowed('workspace.read', {}, ALL);
+    expectAllowed('workspace.readAdmin', {}, ['Owner', 'Admin']);
     expectAllowed('workspace.update', {}, ['Owner', 'Admin']);
     expectAllowed('workspace.delete', {}, ['Owner']);
     expectAllowed('workspace.transferOwnership', {}, ['Owner']);
@@ -136,6 +137,10 @@ describe('projects and members (4.2 rows 5–6)', () => {
     expectAllowed('project.read', { member: false }, ['Owner', 'Admin', 'Finance']);
     expectAllowed('project.read', { member: true, portal: false }, ['Owner', 'Admin', 'PM', 'TeamMember', 'Finance']);
     expectAllowed('project.read', { member: true, projectClient: CLIENT_B }, ['Owner', 'Admin', 'PM', 'TeamMember', 'Finance']);
+  });
+
+  it('budgets are finance data: hidden from Team Members and contacts', () => {
+    expectAllowed('project.viewFinancials', { member: true }, ['Owner', 'Admin', 'PM', 'Finance']);
   });
 
   it('update: Owner/Admin, PM on member projects', () => {

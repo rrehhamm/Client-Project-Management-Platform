@@ -81,7 +81,9 @@ const OWNER_ADMIN = { [OWNER]: true, [ADMIN]: true };
 
 export const RULES = {
   // Workspace settings, branding
-  'workspace.read': { ...OWNER_ADMIN },
+  // D-17: everyone signed in reads the public branding/locale fields
+  'workspace.read': { ...ALL_INTERNAL, [CONTACT]: true },
+  'workspace.readAdmin': { ...OWNER_ADMIN }, // numbering, currency lock
   'workspace.update': { ...OWNER_ADMIN },
   'workspace.delete': { [OWNER]: true }, // BR-USER-04, also billing plan
   'workspace.transferOwnership': { [OWNER]: true }, // BR-ROLE-01
@@ -98,6 +100,7 @@ export const RULES = {
   'user.deactivate': { [OWNER]: true, [ADMIN]: targetIsNotOwner },
 
   // Clients
+  'client.list': { ...ALL_INTERNAL }, // rows scoped by auth/scopes.js; contacts use /auth/me
   'client.create': { ...OWNER_ADMIN, [PM]: true },
   'client.read': {
     ...OWNER_ADMIN,
@@ -117,6 +120,7 @@ export const RULES = {
   'contact.delete': { ...OWNER_ADMIN, [PM]: true },
 
   // Projects
+  'project.list': { ...ALL_INTERNAL, [CONTACT]: true }, // rows scoped by auth/scopes.js
   'project.create': { ...OWNER_ADMIN, [PM]: true },
   'project.read': {
     ...OWNER_ADMIN,
@@ -126,6 +130,8 @@ export const RULES = {
     [CONTACT]: contactOnProject,
   },
   'project.update': { ...OWNER_ADMIN, [PM]: isMember }, // incl. status changes (BRD 16.1)
+  // Budget amounts are finance data: never for Team Members or contacts (persona Omar, BR-DASH-03)
+  'project.viewFinancials': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true },
   'project.delete': { ...OWNER_ADMIN },
 
   // Project members
