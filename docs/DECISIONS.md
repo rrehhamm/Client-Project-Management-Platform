@@ -57,6 +57,13 @@ Tax is taken on the already-rounded line subtotal, as agreed in D-15.
 
 None open. I-01…I-05 were answered on 2026-10-25 and are now D-13, D-14, D-11, D-16 and D-15. (IDs D-09 and D-10 were placeholders for I-01/I-02 and are not used.)
 
+## Engineering requests
+
+| ID | Request | Status |
+|---|---|---|
+| E-01 | API test files must not depend on running in a fixed order against one shared database. Each file creates its own data, so files can run in any order or in parallel. (Requested 2026-10-25 after Phase 2; today files run in path order, see `server/vitest.config.js`.) | Planned at the start of Phase 3 |
+| E-02 | Bundle size: no further splitting needed for now (main bundle ~565 KB / 177 KB gzip). | Closed 2026-10-25 |
+
 ## Deferred test cases
 
 Covered now at the `can()` level (unit tests in `server/src/auth/can.test.js`). The exact API test is added when the endpoint ships.
