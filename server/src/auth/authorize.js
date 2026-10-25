@@ -51,16 +51,18 @@ export function authorizeFields(fieldActions) {
   return async (req, _res, next) => {
     const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
     const keys = Object.keys(body);
-    const unknown = keys.filter((k) => !Object.hasOwn(fieldActions, k));
-    if (unknown.length) {
-      throw validationError(unknown.map((field) => ({ field, message: 'Unknown field' })), 'Request contains unknown fields');
-    }
-    const denied = keys.filter((k) => fieldActions[k] && !can(req.principal, fieldActions[k], req.ctx ?? {}));
+    // Forbidden known fields first (403), so a request mixing them with unknown
+    // fields is still reported as a permission problem (TC-ROLE-005).
+    const denied = keys.filter((k) => Object.hasOwn(fieldActions, k) && fieldActions[k] && !can(req.principal, fieldActions[k], req.ctx ?? {}));
     if (denied.length) {
       await recordDenial(req, 'fields', { fields: denied });
       const err = forbidden('You are not allowed to change some of these fields');
       err.fields = denied.map((field) => ({ field, message: 'Not allowed for your role' }));
       throw err;
+    }
+    const unknown = keys.filter((k) => !Object.hasOwn(fieldActions, k));
+    if (unknown.length) {
+      throw validationError(unknown.map((field) => ({ field, message: 'Unknown field' })), 'Request contains unknown fields');
     }
     next();
   };

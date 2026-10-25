@@ -169,6 +169,23 @@ export const RULES = {
   'task.update': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, or(isOwn, isAssigned)) },
   'task.delete': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) },
   'task.changeVisibility': { ...OWNER_ADMIN, [PM]: isMember }, // FR-TSK-14, BR-TSK-05
+  // D-24 field groups. "Work" = status, checklist, description, estimate (assigned or own);
+  // "details" = title, priority, dates, labels (own tasks only for Team Members).
+  'task.editWork': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, or(isOwn, isAssigned)) },
+  'task.editDetails': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) },
+  'task.changeMilestone': { ...OWNER_ADMIN, [PM]: isMember },
+  'task.changeBillable': { ...OWNER_ADMIN, [PM]: isMember },
+  'task.assignOthers': { ...OWNER_ADMIN, [PM]: isMember }, // D-24: only PM/Admin/Owner reassign
+  'task.assignSelf': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember }, // D-24
+  'task.reopen': { ...OWNER_ADMIN, [PM]: isMember }, // D-23: Done/Cancelled → To Do
+  'task.move': { ...OWNER_ADMIN, [PM]: isMember }, // BR-TSK-04, D-27
+  'task.manageDependencies': { ...OWNER_ADMIN, [PM]: isMember }, // FR-TSK-07
+
+  // Project templates (FR-PRJ-02/03, D-26)
+  'template.list': { ...OWNER_ADMIN, [PM]: true },
+  'template.save': { ...OWNER_ADMIN, [PM]: isMember }, // from a project they belong to
+  'template.manage': { ...OWNER_ADMIN, [PM]: true }, // rename, delete
+  'project.duplicate': { ...OWNER_ADMIN, [PM]: isMember }, // FR-PRJ-12
 
   // Comments (on projects, tasks, files, approvals)
   'comment.read': {
