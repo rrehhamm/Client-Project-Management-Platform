@@ -3,7 +3,6 @@ import { AppShell } from '@/components/AppShell';
 import { AuthLayout } from '@/components/AuthLayout';
 import { InternalLayout } from '@/components/InternalLayout';
 import { PortalLayout } from '@/components/PortalLayout';
-import { AccountPage } from '@/features/account/AccountPage';
 import { AcceptInvitePage } from '@/features/auth/AcceptInvitePage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
 import { PublicOnly, RequireCapability, RequireSession } from '@/features/auth/guards';
@@ -15,7 +14,17 @@ import { PortalHomePage } from '@/features/portal/PortalHomePage';
 import { NotFoundPage } from '@/features/system/NotFoundPage';
 import { RouteErrorPage } from '@/features/system/RouteErrorPage';
 import { SystemStatusPage } from '@/features/system/SystemStatusPage';
-import { TeamPage } from '@/features/team/TeamPage';
+import {
+  AccountPage,
+  ClientDetailPage,
+  ClientsPage,
+  ProjectDetailPage,
+  ProjectsPage,
+  TeamPage,
+  WorkspaceSettingsPage,
+} from '@/lazyPages';
+
+const gated = (capability, element) => <RequireCapability capability={capability}>{element}</RequireCapability>;
 
 export const routes = [
   {
@@ -51,7 +60,12 @@ export const routes = [
             element: <InternalLayout />,
             children: [
               { index: true, element: <DashboardPage /> },
-              { path: '/team', element: <RequireCapability capability="manage_team"><TeamPage /></RequireCapability> },
+              { path: '/clients', element: gated('view_clients', <ClientsPage />) },
+              { path: '/clients/:id', element: gated('view_clients', <ClientDetailPage />) },
+              { path: '/projects', element: gated('list_projects', <ProjectsPage />) },
+              { path: '/projects/:id', element: gated('list_projects', <ProjectDetailPage />) },
+              { path: '/team', element: gated('manage_team', <TeamPage />) },
+              { path: '/settings', element: gated('manage_workspace', <WorkspaceSettingsPage />) },
               { path: '/account', element: <AccountPage /> },
             ],
           },

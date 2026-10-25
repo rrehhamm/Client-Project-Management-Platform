@@ -54,19 +54,24 @@ function refreshSession() {
   return refreshRequest;
 }
 
-async function send(path, { method = 'GET', body, signal, headers, freshCsrf = false } = {}) {
+/**
+ * `body` is sent as JSON. For file uploads pass `rawBody` (a File/Blob) and its
+ * `contentType` instead; the server checks the content itself.
+ */
+async function send(path, { method = 'GET', body, rawBody, contentType, signal, headers, freshCsrf = false } = {}) {
   const unsafe = !SAFE_METHODS.has(method);
+  const typeHeader = rawBody !== undefined ? { 'Content-Type': contentType || 'application/octet-stream' } : body !== undefined ? { 'Content-Type': 'application/json' } : {};
   return fetch(`${BASE}${path}`, {
     method,
     credentials: 'include',
     signal,
     headers: {
       Accept: 'application/json',
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...typeHeader,
       ...(unsafe ? { 'X-CSRF-Token': await csrfToken({ fresh: freshCsrf }) } : {}),
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: rawBody !== undefined ? rawBody : body !== undefined ? JSON.stringify(body) : undefined,
   });
 }
 

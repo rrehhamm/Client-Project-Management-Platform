@@ -41,13 +41,14 @@ export function mockApi(routes) {
 /** /auth/me payload for a role (capabilities mirror the server's). */
 export function meFor(role, overrides = {}) {
   const isContact = role === 'Contact';
+  const work = { view_clients: true, create_clients: true, edit_clients: true, manage_contacts: true, list_projects: true, create_projects: true, view_financials: true };
   const caps = {
-    Owner: { manage_team: true, invite_users: true, invite_any_role: true, change_roles: true, deactivate_users: true, view_rates: true, edit_rates: true, transfer_ownership: true },
-    Admin: { manage_team: true, invite_users: true, invite_any_role: true, change_roles: true, deactivate_users: true, view_rates: true, edit_rates: true },
-    PM: { manage_team: true, invite_users: true },
-    Finance: { manage_team: true, view_rates: true, edit_rates: true },
-    TeamMember: {},
-    Contact: {},
+    Owner: { manage_team: true, invite_users: true, invite_any_role: true, change_roles: true, deactivate_users: true, view_rates: true, edit_rates: true, transfer_ownership: true, manage_workspace: true, delete_clients: true, delete_projects: true, ...work },
+    Admin: { manage_team: true, invite_users: true, invite_any_role: true, change_roles: true, deactivate_users: true, view_rates: true, edit_rates: true, manage_workspace: true, delete_clients: true, delete_projects: true, ...work },
+    PM: { manage_team: true, invite_users: true, ...work },
+    Finance: { manage_team: true, view_rates: true, edit_rates: true, view_clients: true, list_projects: true, view_financials: true },
+    TeamMember: { list_projects: true },
+    Contact: { list_projects: true },
   }[role];
   return {
     principal: {

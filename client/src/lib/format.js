@@ -13,6 +13,15 @@ export function formatMoney(minor, currency) {
   return `${fromMinor(minor, currency)} ${currency}`;
 }
 
+/** "2026-11-10" in the workspace date format (FR-WS-01): DD/MM/YYYY, MM/DD/YYYY or YYYY-MM-DD. */
+export function formatDate(iso, dateFormat = 'DD/MM/YYYY') {
+  if (!iso) return t('common.none');
+  const [y, m, d] = iso.slice(0, 10).split('-');
+  if (dateFormat === 'MM/DD/YYYY') return `${m}/${d}/${y}`;
+  if (dateFormat === 'YYYY-MM-DD') return `${y}-${m}-${d}`;
+  return `${d}/${m}/${y}`;
+}
+
 /** Time zones the browser knows, for pickers. */
 export function timeZones() {
   try {

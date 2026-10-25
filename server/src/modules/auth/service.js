@@ -160,6 +160,16 @@ function capabilitiesFor(principal) {
     view_rates: can(principal, 'user.viewRates'),
     edit_rates: can(principal, 'user.updateRates', teamMemberTarget),
     transfer_ownership: can(principal, 'workspace.transferOwnership'),
+    manage_workspace: can(principal, 'workspace.update'),
+    view_clients: can(principal, 'client.readDetails'),
+    create_clients: can(principal, 'client.create'),
+    edit_clients: can(principal, 'client.update'),
+    delete_clients: can(principal, 'client.delete'),
+    manage_contacts: can(principal, 'contact.create'),
+    list_projects: can(principal, 'project.list'),
+    create_projects: can(principal, 'project.create'),
+    delete_projects: can(principal, 'project.delete'),
+    view_financials: can(principal, 'project.viewFinancials'),
   };
 }
 
