@@ -3,16 +3,20 @@ import { createApp } from './app.js';
 import { config } from './config.js';
 import { db } from './lib/db.js';
 import { logger } from './lib/logger.js';
+import { startJobs } from './jobs/index.js';
 
 const server = createApp().listen(config.port, () => {
   logger.info({ port: config.port, env: config.env }, `API listening on http://localhost:${config.port}`);
 });
+
+const stopJobs = startJobs();
 
 let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info({ signal }, 'Shutting down');
+  stopJobs();
   server.close(async () => {
     await db.$disconnect();
     process.exit(0);

@@ -48,6 +48,9 @@ export class ApiClient {
   patch(url, body) {
     return this.#with(this.agent.patch(url)).send(body ?? {});
   }
+  put(url, body) {
+    return this.#with(this.agent.put(url)).send(body ?? {});
+  }
   delete(url) {
     return this.#with(this.agent.delete(url));
   }
@@ -101,6 +104,33 @@ export async function createContact({ clientId, portalAccess = true, status = 'A
       password_hash: await hashPassword(password),
     },
   });
+}
+
+/** Unique client name / 3-letter prefix for tests that need their own client. */
+export function uniqueClientName(prefix = 'Client') {
+  return `${prefix} ${randomUUID().slice(0, 8)}`;
+}
+
+/** Create an Active client through the API as `c` (an admin/PM client). Returns the body. */
+export async function apiCreateClient(c, overrides = {}) {
+  const res = await c.post('/api/v1/clients', { name: uniqueClientName(), ...overrides });
+  expect(res.status, JSON.stringify(res.body)).toBe(201);
+  return res.body;
+}
+
+/** Create a project through the API. `pmId` defaults to Lina. */
+export async function apiCreateProject(c, { clientId, pmId, ...overrides } = {}) {
+  const pm = pmId ?? (await db.user.findUniqueOrThrow({ where: { email: SEED.pm } })).id;
+  const res = await c.post('/api/v1/projects', {
+    client_id: clientId,
+    name: `Project ${randomUUID().slice(0, 8)}`,
+    start_date: '2026-10-01',
+    billing_type: 'Fixed',
+    pm_user_id: pm,
+    ...overrides,
+  });
+  expect(res.status, JSON.stringify(res.body)).toBe(201);
+  return res.body;
 }
 
 /** Token from the most recent email sent by the mocked sendMail containing `path`. */

@@ -14,6 +14,9 @@ import { requestId } from './lib/requestId.js';
 import { createAuthRouter } from './modules/auth/routes.js';
 import { healthRouter } from './modules/health/routes.js';
 import { usersRouter } from './modules/users/routes.js';
+import { clientsRouter, contactsRouter } from './modules/clients/routes.js';
+import { milestonesRouter, projectsRouter } from './modules/projects/routes.js';
+import { workspaceRouter } from './modules/workspace/routes.js';
 
 /**
  * @param {object} [options]
@@ -74,6 +77,11 @@ export function createApp(options = {}) {
     }),
   );
   api.use('/users', usersRouter);
+  api.use('/workspace', workspaceRouter);
+  api.use('/clients', clientsRouter);
+  api.use('/contacts', contactsRouter);
+  api.use('/projects', projectsRouter);
+  api.use('/milestones', milestonesRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
