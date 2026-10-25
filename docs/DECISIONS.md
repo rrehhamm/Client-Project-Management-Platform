@@ -63,12 +63,16 @@ Covered now at the `can()` level (unit tests in `server/src/auth/can.test.js`). 
 
 | TC | What the BRD asks | Covered now by | Exact API test in |
 |---|---|---|---|
-| TC-ROLE-002 | Lina demoted to Team Member → creating a project gets 403 | API test: demoted PM gets 403 when inviting a Team Member (also a PM-only action) | Phase 2 (POST /projects) |
-| TC-ROLE-003 | Team Member `POST /api/v1/projects` → 403, no record | `can()` test | Phase 2 |
-| TC-ROLE-004 | Team Member `DELETE /api/v1/projects/{A}` → 403 | `can()` test | Phase 2 |
+| ~~TC-ROLE-002~~ | Lina demoted to Team Member → creating a project gets 403 | **Done in Phase 2** (`projects.test.js`) | — |
+| ~~TC-ROLE-003~~ | Team Member `POST /api/v1/projects` → 403, no record | **Done in Phase 2** | — |
+| ~~TC-ROLE-004~~ | Team Member `DELETE /api/v1/projects/{A}` → 403 | **Done in Phase 2** | — |
 | TC-ROLE-005 | Team Member PATCH task with `visibility` and `project_id` → ignored or 403, DB unchanged | `can()` test; field-level mechanism tested on `/users` | Phase 3 |
 | TC-ROLE-006 | Team Member `GET /api/v1/invoices` → 403 | `can()` test | Phase 7 |
 | TC-USER-002 (part) | Deactivated user's open tasks keep the assignee and show "Assignee inactive" | Deactivation, sign-out and "not assignable" tested now | Phase 3 |
-| TC-AUTH-003 (page) | Signed-out `GET /projects` page → `/login?next=/projects` | Same redirect tested with `/team` (Vitest + Playwright) | Phase 2 |
+| ~~TC-AUTH-003 (page)~~ | Signed-out `GET /projects` page → `/login?next=/projects` | **Done in Phase 2** (Playwright `projects.spec.js`) | — |
+| FR-PRJ-02/03 | Project templates | — (D-18) | Phase 3 |
+| FR-PRJ-07 (live) | Progress recalculated on every task status change | Calculation built and used on reopen | Phase 3 |
+| FR-PRJ-06 (notify) | Status change notified to members | Change logged now | Phase 4 |
+| FR-PRJ-11 (files) | Purge also removes stored files of purged projects | Database rows purged now | Phase 4 |
 | E2E-05 | Unauthorised attempts recorded in the audit log | Denials are audited (`access.denied`), tested on `/users` | Phase 4 |
 | E2E-07 (part) | Deactivating an employee stops and saves a running timer | — | Phase 6 |

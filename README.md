@@ -54,7 +54,7 @@ Run from the repo root.
 | `npm run db:seed -w server` | Load seed data (safe to re-run) |
 | `npm run db:studio -w server` | Browse the database in Prisma Studio |
 
-Server tests use a separate database (`TEST_DATABASE_URL`, must end in `_test`). Each run wipes it, migrates it and seeds it, so tests never touch your dev data. The test suite uses bcrypt cost 4 for speed; outside tests the server refuses a cost below 12. Playwright tests use the dev database and read invitation emails from Mailpit, so `npm run setup` must have run.
+Server test files run one at a time in path order (seed checks first), so tests that read seeded records such as NOV-001 always see the same state. Server tests use a separate database (`TEST_DATABASE_URL`, must end in `_test`). Each run wipes it, migrates it and seeds it, so tests never touch your dev data. The test suite uses bcrypt cost 4 for speed; outside tests the server refuses a cost below 12. Playwright tests use the dev database and read invitation emails from Mailpit, so `npm run setup` must have run.
 
 ## Repository layout
 
@@ -89,6 +89,17 @@ docs/              the BRD
   - Denied: 403, or 404 for client contacts when the record must stay hidden. Every denial is written to the audit log.
   - Fields a role may not set: 403. Unknown fields: 422.
 - **Secure cookies on localhost.** `COOKIE_SECURE=true` works on http://localhost, because browsers treat localhost as secure. Tests set it to `false`.
+
+## What exists so far
+
+| Area | Where |
+|---|---|
+| Sign-in, sessions, invitations, passwords, profile | `server/src/modules/auth`, `client/src/features/auth`, `features/account` |
+| Team (internal users) | `server/src/modules/users`, `client/src/features/team` |
+| Workspace settings and logo | `server/src/modules/workspace`, `client/src/features/settings` |
+| Clients and contacts | `server/src/modules/clients`, `client/src/features/clients` |
+| Projects, members, milestones, activity | `server/src/modules/projects`, `client/src/features/projects` |
+| Nightly jobs (purge projects deleted > 30 days ago) | `server/src/jobs` (node-cron, 03:15 UTC) |
 
 ## Conventions
 
