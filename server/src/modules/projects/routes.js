@@ -8,6 +8,7 @@ import {
   paginationSchema,
   projectCreateSchema,
   projectDeleteSchema,
+  projectDuplicateSchema,
   projectListQuerySchema,
   projectStatusSchema,
   projectUpdateSchema,
@@ -61,6 +62,11 @@ projectsRouter.delete('/:id', authorize('project.delete', opts()), validateBody(
 });
 projectsRouter.post('/:id/restore', authorize('project.delete', { load: loadIncludingDeleted }), async (req, res) => {
   res.json(await service.restoreProject(req.principal, req.ctx.project, req));
+});
+
+// Duplicate (FR-PRJ-12, D-26)
+projectsRouter.post('/:id/duplicate', authorize('project.duplicate', opts()), validateBody(projectDuplicateSchema), async (req, res) => {
+  res.status(201).json(await service.duplicateProject(req.principal, req.ctx.project, req.body, req));
 });
 
 // Members (FR-PRJ-05, D-14)

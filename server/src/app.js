@@ -17,6 +17,8 @@ import { usersRouter } from './modules/users/routes.js';
 import { clientsRouter, contactsRouter } from './modules/clients/routes.js';
 import { milestonesRouter, projectsRouter } from './modules/projects/routes.js';
 import { workspaceRouter } from './modules/workspace/routes.js';
+import { meRouter, projectTasksRouter, tasksRouter } from './modules/tasks/routes.js';
+import { templatesRouter } from './modules/templates/routes.js';
 
 /**
  * @param {object} [options]
@@ -81,6 +83,10 @@ export function createApp(options = {}) {
   api.use('/clients', clientsRouter);
   api.use('/contacts', contactsRouter);
   api.use('/projects', projectsRouter);
+  api.use('/projects', projectTasksRouter);
+  api.use('/tasks', tasksRouter);
+  api.use('/me', meRouter);
+  api.use('/templates', templatesRouter);
   api.use('/milestones', milestonesRouter);
   app.use('/api/v1', api);
 

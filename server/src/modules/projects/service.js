@@ -17,6 +17,8 @@ import { pick, writeAudit } from '../../lib/audit.js';
 import { db } from '../../lib/db.js';
 import { fromDbDate, toDbDate } from '../../lib/dates.js';
 import { AppError, conflict, fieldError, staleUpdate, transitionNotAllowed } from '../../lib/errors.js';
+import { applyStructure, snapshotProject, structureFromTemplate } from '../templates/structure.js';
+import { assertTemplateUsable } from '../templates/service.js';
 import { assertWritable, membershipOf, projectInclude, recalculateProgress, toProjectDto, todayForWorkspace } from './common.js';
 
 const RESTORE_DAYS = 30; // FR-PRJ-11
@@ -132,8 +134,14 @@ async function activeClient(workspaceId, clientId, client = db) {
   return c;
 }
 
-export async function createProject(viewer, body, req) {
+/**
+ * @param {object} [options]
+ * @param {object} [options.structure]  milestones/tasks/members to copy in (FR-PRJ-12)
+ * @param {string} [options.duplicatedFromId]
+ */
+export async function createProject(viewer, body, req, { structure: givenStructure = null, duplicatedFromId = null } = {}) {
   await assertEligiblePm(viewer.workspace_id, body.pm_user_id);
+  if (body.template_id) await assertTemplateUsable(viewer.workspace_id, body.template_id); // FR-PRJ-02
   const created = await db.$transaction(async (tx) => {
     const client = await activeClient(viewer.workspace_id, body.client_id, tx);
     await assertNameFree(client.id, body.name, null, tx);
@@ -162,6 +170,8 @@ export async function createProject(viewer, body, req) {
         pm_user_id: body.pm_user_id,
         portal_enabled: body.portal_enabled ?? false,
         close_task_on_approval: body.close_task_on_approval ?? false,
+        source_template_id: body.template_id ?? null,
+        duplicated_from_id: duplicatedFromId,
         created_by: viewer.id,
         updated_by: viewer.id,
       },
@@ -176,11 +186,22 @@ export async function createProject(viewer, body, req) {
         data: { workspace_id: viewer.workspace_id, project_id: project.id, user_id: viewer.id, project_role: PROJECT_ROLE.MEMBER, created_by: viewer.id, updated_by: viewer.id },
       });
     }
+    // FR-PRJ-02 / FR-PRJ-12: copy milestones, tasks, checklists, dependencies, default members (D-26)
+    const structure = body.template_id ? await structureFromTemplate(tx, body.template_id) : givenStructure;
+    const copied = structure ? await applyStructure(tx, structure, project, viewer) : null;
     await writeAudit(
-      { req, action: 'project.created', entityType: 'Project', entityId: project.id, projectId: project.id, clientId: client.id, after: { code: project.code, ...auditView(project, AUDITED) } },
+      {
+        req,
+        action: duplicatedFromId ? 'project.duplicated' : 'project.created',
+        entityType: 'Project',
+        entityId: project.id,
+        projectId: project.id,
+        clientId: client.id,
+        after: { code: project.code, ...auditView(project, AUDITED), template_id: body.template_id ?? null, duplicated_from_id: duplicatedFromId, copied },
+      },
       tx,
     );
-    return project;
+    return tx.project.findUniqueOrThrow({ where: { id: project.id }, include: projectInclude });
   });
   return toProjectDto(created, viewer, { today: await todayForWorkspace(viewer.workspace_id) });
 }
@@ -365,4 +386,33 @@ export async function restoreProject(viewer, project, req) {
   });
   await writeAudit({ req, action: 'project.restored', entityType: 'Project', entityId: project.id, projectId: project.id, clientId: project.client_id });
   return getProjectDetail(viewer, after);
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate (FR-PRJ-12, D-26): same copy as a template, new name required
+// ---------------------------------------------------------------------------
+
+export async function duplicateProject(viewer, project, { name, start_date: startDate }, req) {
+  const start = startDate ?? fromDbDate(project.start_date);
+  const shift = Date.parse(`${start}T00:00:00Z`) - project.start_date.getTime();
+  const due = project.due_date ? new Date(project.due_date.getTime() + shift).toISOString().slice(0, 10) : null;
+  const structure = await snapshotProject(db, project);
+  return createProject(
+    viewer,
+    {
+      client_id: project.client_id,
+      name,
+      description: project.description,
+      start_date: start,
+      due_date: due,
+      billing_type: project.billing_type,
+      pm_user_id: project.pm_user_id,
+      budget_amount: project.budget_amount,
+      budget_minutes: project.budget_minutes,
+      portal_enabled: project.portal_enabled,
+      close_task_on_approval: project.close_task_on_approval,
+    },
+    req,
+    { structure, duplicatedFromId: project.id },
+  );
 }
