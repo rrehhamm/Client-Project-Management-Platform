@@ -250,37 +250,39 @@ model Workspace {
   updated_by            String?   @db.Uuid
   version               Int       @default(1)
 
-  users               User[]
-  clients             Client[]
-  client_contacts     ClientContact[]
-  projects            Project[]
-  project_members     ProjectMember[]
-  milestones          Milestone[]
-  tasks               Task[]
-  task_assignees      TaskAssignee[]
-  task_dependencies   TaskDependency[]
-  comments            Comment[]
-  mentions            Mention[]
-  followers           Follower[]
-  files               File[]
-  file_versions       FileVersion[]
-  approval_requests   ApprovalRequest[]
-  approval_approvers  ApprovalApprover[]
-  time_entries        TimeEntry[]
-  timesheets          Timesheet[]
-  proposals           Proposal[]
-  proposal_lines      ProposalLine[]
-  contracts           Contract[]
-  contract_signatures ContractSignature[]
-  invoices            Invoice[]
-  invoice_lines       InvoiceLine[]
-  payments            Payment[]
-  expenses            Expense[]
-  notifications       Notification[]
-  activity_logs       ActivityLog[]
-  sessions            Session[]
-  auth_tokens         AuthToken[]
-  login_throttles     LoginThrottle[]
+  users                User[]
+  clients              Client[]
+  client_contacts      ClientContact[]
+  projects             Project[]
+  project_members      ProjectMember[]
+  milestones           Milestone[]
+  tasks                Task[]
+  task_assignees       TaskAssignee[]
+  task_dependencies    TaskDependency[]
+  comments             Comment[]
+  mentions             Mention[]
+  followers            Follower[]
+  files                File[]
+  file_versions        FileVersion[]
+  approval_requests    ApprovalRequest[]
+  approval_approvers   ApprovalApprover[]
+  time_entries         TimeEntry[]
+  timesheets           Timesheet[]
+  proposals            Proposal[]
+  proposal_lines       ProposalLine[]
+  contracts            Contract[]
+  contract_signatures  ContractSignature[]
+  invoices             Invoice[]
+  invoice_lines        InvoiceLine[]
+  payments             Payment[]
+  expenses             Expense[]
+  notifications        Notification[]
+  activity_logs        ActivityLog[]
+  sessions             Session[]
+  auth_tokens          AuthToken[]
+  login_throttles      LoginThrottle[]
+  task_checklist_items TaskChecklistItem[]
+  project_templates    ProjectTemplate[]
 
   @@map("workspaces")
 }
@@ -456,6 +458,9 @@ model Project {
   portal_enabled         Boolean       @default(false)
   /// BR-APP-03
   close_task_on_approval Boolean       @default(false)
+  /// FR-PRJ-02 / FR-PRJ-12: where the structure came from
+  source_template_id     String?       @db.Uuid
+  duplicated_from_id     String?       @db.Uuid
   completed_at           DateTime?     @db.Timestamptz(3)
   /// Archived is a flag on Completed/Cancelled projects, not a status (BRD 16.1)
   archived_at            DateTime?     @db.Timestamptz(3)
@@ -482,6 +487,7 @@ model Project {
   contracts         Contract[]
   invoices          Invoice[]
   expenses          Expense[]
+  source_template   ProjectTemplate?  @relation(fields: [source_template_id], references: [id], onDelete: SetNull)
 
   @@unique([workspace_id, code])
   @@unique([client_id, name_normalized], map: "projects_name_unique_per_client", where: raw("deleted_at IS NULL"))
@@ -576,6 +582,8 @@ model Task {
   /// null = inherit from project (FR-TIME-02)
   is_billable             Boolean?
   sort_order              Int          @default(0)
+  /// FR-TSK-02 labels (max 10, each ≤ 30 chars); "Client request" marks portal requests
+  labels                  String[]     @default([])
   /// FR-PORT-03: created from a portal request
   is_client_request       Boolean      @default(false)
   requested_by_contact_id String?      @db.Uuid
@@ -587,23 +595,25 @@ model Task {
   updated_by              String?      @db.Uuid
   version                 Int          @default(1)
 
-  workspace         Workspace         @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
-  project           Project           @relation(fields: [project_id], references: [id], onDelete: Restrict)
-  milestone         Milestone?        @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
-  parent            Task?             @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: Restrict)
-  subtasks          Task[]            @relation("Subtasks")
-  requested_by      ClientContact?    @relation(fields: [requested_by_contact_id], references: [id], onDelete: Restrict)
+  workspace         Workspace           @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  project           Project             @relation(fields: [project_id], references: [id], onDelete: Restrict)
+  milestone         Milestone?          @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
+  parent            Task?               @relation("Subtasks", fields: [parent_task_id], references: [id], onDelete: Restrict)
+  subtasks          Task[]              @relation("Subtasks")
+  requested_by      ClientContact?      @relation(fields: [requested_by_contact_id], references: [id], onDelete: Restrict)
   assignees         TaskAssignee[]
-  predecessors      TaskDependency[]  @relation("DependencySuccessor")
-  successors        TaskDependency[]  @relation("DependencyPredecessor")
+  predecessors      TaskDependency[]    @relation("DependencySuccessor")
+  successors        TaskDependency[]    @relation("DependencyPredecessor")
   files             File[]
   approval_requests ApprovalRequest[]
   time_entries      TimeEntry[]
+  checklist_items   TaskChecklistItem[]
 
   @@index([project_id, status])
   @@index([project_id, sort_order])
   @@index([milestone_id])
   @@index([parent_task_id])
+  @@index([labels], map: "tasks_labels_gin", type: Gin)
   @@map("tasks")
 }
 
@@ -1324,4 +1334,129 @@ model LoginThrottle {
   workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
 
   @@map("login_throttles")
+}
+
+// ---------------------------------------------------------------------------
+// Task checklists and project templates (Phase 3)
+// ---------------------------------------------------------------------------
+
+/// FR-TSK-05: simple checklist inside a task; does not affect progress.
+model TaskChecklistItem {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  workspace_id String   @db.Uuid
+  task_id      String   @db.Uuid
+  text         String   @db.VarChar(500)
+  is_done      Boolean  @default(false)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+  created_by   String?  @db.Uuid
+  updated_at   DateTime @updatedAt @db.Timestamptz(3)
+  updated_by   String?  @db.Uuid
+  version      Int      @default(1)
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  task      Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@index([task_id, sort_order])
+  @@map("task_checklist_items")
+}
+
+/// FR-PRJ-02/03 (D-26): reusable project structure. Dates are day offsets from
+/// the project start. Never stores assignees, comments, files or time.
+model ProjectTemplate {
+  id                String      @id @default(uuid(7)) @db.Uuid
+  workspace_id      String      @db.Uuid
+  name              String      @db.VarChar(150)
+  name_normalized   String      @db.VarChar(150)
+  description       String?
+  billing_type      BillingType @default(Fixed)
+  /// The project it was saved from (kept even if that project is deleted)
+  source_project_id String?     @db.Uuid
+  created_at        DateTime    @default(now()) @db.Timestamptz(3)
+  created_by        String?     @db.Uuid
+  updated_at        DateTime    @updatedAt @db.Timestamptz(3)
+  updated_by        String?     @db.Uuid
+  version           Int         @default(1)
+
+  workspace  Workspace           @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  milestones TemplateMilestone[]
+  tasks      TemplateTask[]
+  members    TemplateMember[]
+  projects   Project[]
+
+  @@unique([workspace_id, name_normalized])
+  @@map("project_templates")
+}
+
+model TemplateMilestone {
+  id              String     @id @default(uuid(7)) @db.Uuid
+  workspace_id    String     @db.Uuid
+  template_id     String     @db.Uuid
+  title           String     @db.VarChar(255)
+  description     String?
+  due_offset_days Int
+  amount          BigInt?
+  visibility      Visibility @default(Internal)
+  sort_order      Int        @default(0)
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  created_by      String?    @db.Uuid
+  updated_at      DateTime   @updatedAt @db.Timestamptz(3)
+  updated_by      String?    @db.Uuid
+
+  template ProjectTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  tasks    TemplateTask[]
+
+  @@index([template_id])
+  @@map("template_milestones")
+}
+
+model TemplateTask {
+  id                    String       @id @default(uuid(7)) @db.Uuid
+  workspace_id          String       @db.Uuid
+  template_id           String       @db.Uuid
+  template_milestone_id String?      @db.Uuid
+  parent_id             String?      @db.Uuid
+  title                 String       @db.VarChar(255)
+  description           String?
+  priority              TaskPriority @default(Normal)
+  visibility            Visibility   @default(Internal)
+  estimate_minutes      Int?
+  is_billable           Boolean?
+  labels                String[]     @default([])
+  start_offset_days     Int?
+  due_offset_days       Int?
+  sort_order            Int          @default(0)
+  /// Checklist texts, in order
+  checklist             String[]     @default([])
+  /// Template tasks this one depends on (finish-to-start, D-26)
+  predecessor_ids       String[]     @default([]) @db.Uuid
+  created_at            DateTime     @default(now()) @db.Timestamptz(3)
+  created_by            String?      @db.Uuid
+  updated_at            DateTime     @updatedAt @db.Timestamptz(3)
+  updated_by            String?      @db.Uuid
+
+  template  ProjectTemplate    @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  milestone TemplateMilestone? @relation(fields: [template_milestone_id], references: [id], onDelete: SetNull)
+  parent    TemplateTask?      @relation("TemplateSubtasks", fields: [parent_id], references: [id], onDelete: Cascade)
+  subtasks  TemplateTask[]     @relation("TemplateSubtasks")
+
+  @@index([template_id])
+  @@map("template_tasks")
+}
+
+/// Default members added when a project is created from the template.
+model TemplateMember {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  workspace_id String   @db.Uuid
+  template_id  String   @db.Uuid
+  user_id      String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+  created_by   String?  @db.Uuid
+  updated_at   DateTime @updatedAt @db.Timestamptz(3)
+  updated_by   String?  @db.Uuid
+
+  template ProjectTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+
+  @@unique([template_id, user_id])
+  @@map("template_members")
 }

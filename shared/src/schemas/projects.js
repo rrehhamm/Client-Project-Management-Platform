@@ -35,10 +35,13 @@ const projectFields = {
   close_task_on_approval: z.boolean(),
 };
 
+/** FR-PRJ-02: create from a template (create only) */
+const templateIdField = { template_id: uuidSchema };
+
 const datesInOrder = (v) => !v.start_date || !v.due_date || v.due_date >= v.start_date;
 
 export const projectCreateSchema = z
-  .object(projectFields)
+  .object({ ...projectFields, ...templateIdField })
   .partial()
   .required({ client_id: true, name: true, start_date: true, billing_type: true, pm_user_id: true })
   .refine(datesInOrder, { path: ['due_date'], message: DUE_BEFORE_START });
