@@ -16,15 +16,19 @@
 //   ctx.client      { id } for client records
 //   ctx.memberOfClient       Team Member belongs to a project of this client
 //   ctx.isApprover           contact is listed on the approval request
-//   ctx.contactCanApprove    contact holds Approve level on a project of the record's client
+//   ctx.project.pm_user_id   the project's PM (for "project's PM only" rules)
+//
+// Contacts' commercial rights come from principal.commercial_authority (D-16),
+// not from their project portal level.
 //
 // Business rules that are not permissions (e.g. "last administrator", "status
 // must be Draft") live in the services and return 409/422.
 //
 // Deviations from the matrix, each recorded in docs/DECISIONS.md:
 //   D-06 Finance may update user rates (FR-USER-07 over the matrix "—").
-//   D-09 PM may create time entries for members (FR-TIME-08 over the matrix "R").
-//   D-10 PM approval requests and member management are limited to member projects.
+//   D-13 PM may create time entries for members only as the project's PM (FR-TIME-08).
+//   D-14 PM requests approvals on member projects; manages members only as the project's PM.
+//   D-16 Accept / sign / pay need the contact's commercial_authority flag.
 import { PORTAL_LEVEL_ORDER, ROLES, TIME_ENTRY_STATUS, VISIBILITY } from '@cpm/shared';
 
 export const CONTACT = 'Contact';
@@ -42,6 +46,8 @@ const or =
     preds.some((f) => f(p, c));
 
 const isMember = (_p, c) => Boolean(c.membership);
+/** The principal is this project's PM (projects.pm_user_id). */
+const isProjectPm = (p, c) => Boolean(c.project) && c.project.pm_user_id === p.id;
 const ownerIdOf = (r) => r?.author_id ?? r?.user_id ?? r?.created_by ?? null;
 const isOwn = (p, c) => ownerIdOf(c.record) === p.id;
 const isAssigned = (p, c) => Array.isArray(c.record?.assignee_ids) && c.record.assignee_ids.includes(p.id);
@@ -61,7 +67,7 @@ const clientVisible = (_p, c) => c.record?.visibility === VISIBILITY.CLIENT;
 const contactSeesRecord = and(contactOnProject, clientVisible);
 const contactCanComment = and(contactOnProject, portalLevelAtLeast('Comment'));
 const ownClientRecord = (p, c) => Boolean(c.record) && c.record.client_id === p.client_id;
-const contactApproves = (_p, c) => c.contactCanApprove === true;
+const hasCommercialAuthority = (p) => p.commercial_authority === true; // D-16
 
 const targetIsNotOwner = (_p, c) => Boolean(c.target) && c.target.role !== OWNER;
 const targetIsTeamMember = (_p, c) => c.target?.role === TEAM_MEMBER;
@@ -130,7 +136,7 @@ export const RULES = {
     [FINANCE]: true,
     [CONTACT]: contactOnProject, // names only
   },
-  'projectMember.manage': { ...OWNER_ADMIN, [PM]: isMember }, // D-10
+  'projectMember.manage': { ...OWNER_ADMIN, [PM]: isProjectPm }, // D-14: add/remove, portal levels
 
   // Milestones
   'milestone.read': {
@@ -202,14 +208,14 @@ export const RULES = {
   'file.delete': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) },
 
   // Approvals
-  'approval.request': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember }, // D-10
+  'approval.request': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember }, // D-14
   'approval.decide': {
     [CONTACT]: and(contactOnProject, portalLevelAtLeast('Approve'), (_p, c) => c.isApprover === true),
   }, // BR-APP-02: internal users never decide
 
   // Time entries and timesheets
   'timeEntry.read': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isOwn, [FINANCE]: true },
-  'timeEntry.create': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) }, // D-09
+  'timeEntry.create': { ...OWNER_ADMIN, [PM]: isProjectPm, [TEAM_MEMBER]: and(isMember, isOwn) }, // D-13
   'timeEntry.update': { ...OWNER_ADMIN, [TEAM_MEMBER]: timeEntryEditable },
   'timeEntry.delete': { ...OWNER_ADMIN, [TEAM_MEMBER]: timeEntryEditable },
   'timesheet.approve': { ...OWNER_ADMIN, [PM]: isMember }, // FR-TIME-05
@@ -219,19 +225,19 @@ export const RULES = {
   'proposal.create': { ...OWNER_ADMIN, [PM]: true },
   'proposal.update': { ...OWNER_ADMIN, [PM]: true },
   'proposal.delete': { ...OWNER_ADMIN, [PM]: true },
-  'proposal.accept': { [CONTACT]: and(ownClientRecord, contactApproves) },
+  'proposal.accept': { [CONTACT]: and(ownClientRecord, hasCommercialAuthority) },
   'contract.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
   'contract.create': { ...OWNER_ADMIN, [PM]: true },
   'contract.update': { ...OWNER_ADMIN, [PM]: true },
   'contract.delete': { ...OWNER_ADMIN, [PM]: true },
-  'contract.sign': { ...OWNER_ADMIN, [PM]: true, [CONTACT]: and(ownClientRecord, contactApproves) },
+  'contract.sign': { ...OWNER_ADMIN, [PM]: true, [CONTACT]: and(ownClientRecord, hasCommercialAuthority) },
 
   // Invoices and payments
   'invoice.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
   'invoice.create': { ...OWNER_ADMIN, [FINANCE]: true },
   'invoice.update': { ...OWNER_ADMIN, [FINANCE]: true },
   'invoice.delete': { ...OWNER_ADMIN, [FINANCE]: true },
-  'invoice.pay': { [CONTACT]: and(ownClientRecord, contactApproves) },
+  'invoice.pay': { [CONTACT]: and(ownClientRecord, hasCommercialAuthority) },
   'payment.read': { ...OWNER_ADMIN, [PM]: true, [FINANCE]: true, [CONTACT]: ownClientRecord },
   'payment.create': { ...OWNER_ADMIN, [FINANCE]: true },
   'payment.update': { ...OWNER_ADMIN, [FINANCE]: true },

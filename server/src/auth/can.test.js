@@ -22,7 +22,7 @@ const ALL = Object.keys(P);
  * member: p is on the project; level: contact portal level; own/assigned: p
  * created / is assigned the record; visibility: record visibility.
  */
-function ctxFor(p, { member = false, level = 'View', portal = true, projectClient = CLIENT_A, own = false, assigned = false, visibility = 'Internal', status, extra = {}, record = {} } = {}) {
+function ctxFor(p, { pm = false, member = false, level = 'View', portal = true, projectClient = CLIENT_A, own = false, assigned = false, visibility = 'Internal', status, extra = {}, record = {} } = {}) {
   const membership = member
     ? p.kind === 'contact'
       ? { contact_id: p.id, portal_level: level }
@@ -30,7 +30,7 @@ function ctxFor(p, { member = false, level = 'View', portal = true, projectClien
     : null;
   return {
     membership,
-    project: { client_id: projectClient, portal_enabled: portal },
+    project: { client_id: projectClient, portal_enabled: portal, pm_user_id: pm ? p.id : "someone-else" },
     record: {
       visibility,
       created_by: own ? p.id : 'someone-else',
@@ -144,7 +144,9 @@ describe('projects and members (4.2 rows 5–6)', () => {
   });
 
   it('members: PM manages own projects; others read', () => {
-    expectAllowed('projectMember.manage', { member: true }, ['Owner', 'Admin', 'PM']);
+    // D-14: only the project's own PM manages members and portal levels
+    expectAllowed('projectMember.manage', { member: true, pm: true }, ['Owner', 'Admin', 'PM']);
+    expectAllowed('projectMember.manage', { member: true }, ['Owner', 'Admin']);
     expectAllowed('projectMember.manage', { member: false }, ['Owner', 'Admin']);
     expectAllowed('projectMember.read', { member: true }, ALL);
   });
@@ -218,19 +220,35 @@ describe('time, finance, reports, activity (4.2 rows 13–19)', () => {
     expectAllowed('timesheet.approve', { member: true }, ['Owner', 'Admin', 'PM']);
   });
 
+  it('D-13: a PM creates time entries for others only on projects where they are the PM', () => {
+    expectAllowed('timeEntry.create', { member: true, pm: true }, ['Owner', 'Admin', 'PM']);
+    expectAllowed('timeEntry.create', { member: true }, ['Owner', 'Admin']);
+    expectAllowed('timeEntry.create', { member: true, own: true }, ['Owner', 'Admin', 'TeamMember']);
+  });
+
+  it('D-14: a PM requests approvals on any project they belong to', () => {
+    expectAllowed('approval.request', { member: true }, ['Owner', 'Admin', 'PM', 'TeamMember']);
+  });
+
   it('proposals and contracts: contacts read own client, accept/sign with Approve', () => {
     expectAllowed('proposal.create', {}, ['Owner', 'Admin', 'PM']);
     expectAllowed('proposal.read', {}, ['Owner', 'Admin', 'PM', 'Finance', 'Contact']);
     expectAllowed('proposal.read', { projectClient: CLIENT_B }, ['Owner', 'Admin', 'PM', 'Finance']);
-    expectAllowed('proposal.accept', { extra: { contactCanApprove: true } }, ['Contact']);
-    expectAllowed('proposal.accept', { extra: { contactCanApprove: false } }, []);
+    // D-16: commercial rights come from the contact's commercial_authority flag, not portal level
+    const withAuthority = { ...P.Contact, commercial_authority: true };
+    expect(can(withAuthority, 'proposal.accept', ctxFor(withAuthority, {}))).toBe(true);
+    expect(can(withAuthority, 'contract.sign', ctxFor(withAuthority, {}))).toBe(true);
+    expect(can(withAuthority, 'proposal.accept', ctxFor(withAuthority, { projectClient: CLIENT_B }))).toBe(false);
+    expectAllowed('proposal.accept', { member: true, level: 'Approve' }, []); // Approve level alone is not enough
   });
 
   it('invoices: Finance CRUD, PM read; TC-ROLE-006 Team Member GET /invoices is denied', () => {
     expectAllowed('invoice.create', {}, ['Owner', 'Admin', 'Finance']);
     expectAllowed('invoice.read', {}, ['Owner', 'Admin', 'PM', 'Finance', 'Contact']);
     expect(can(P.TeamMember, 'invoice.read', ctxFor(P.TeamMember, {}))).toBe(false);
-    expectAllowed('invoice.pay', { extra: { contactCanApprove: true } }, ['Contact']);
+    const withAuthority = { ...P.Contact, commercial_authority: true };
+    expect(can(withAuthority, 'invoice.pay', ctxFor(withAuthority, {}))).toBe(true);
+    expectAllowed('invoice.pay', {}, []);
   });
 
   it('expenses: Team Member logs own on member projects; Finance CRUD', () => {

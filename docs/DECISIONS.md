@@ -14,7 +14,12 @@ The BRD ([BAD-BRD.pdf](BAD-BRD.pdf)) is the source of truth. This file records e
 | D-06 | **Finance may view and set user rates.** FR-USER-07 ("Admin/Finance set hourly cost rate and default bill rate") wins over the §4.2 matrix, which shows Finance with no access to Users. | FR-USER-07, §4.2 | 2026-10-25 |
 | D-07 | PostgreSQL only. Native `uuid`, partial unique indexes and triggers are allowed. | NFR, schema | 2026-10-24 |
 | D-08 | **Portal idle timeout wins over "Remember me".** A Client Contact must sign in again after 30 minutes without activity, even with "Remember me" on. "Remember me" (30-day session) applies to internal users only. | FR-AUTH-10 | 2026-10-25 |
+| D-11 | Email-change confirmation links expire after **24 hours**. The BRD gives no limit. (was I-03) | FR-AUTH-13 | 2026-10-25 |
 | D-12 | Project names are unique per client, case-insensitive. Archived projects count; soft-deleted projects do not. | BR-PRJ-01 | 2026-10-24 |
+| D-13 | A PM may create time entries for members **only on projects where they are the project's PM** (`projects.pm_user_id`), not on every project they belong to. Narrows FR-TIME-08 / matrix "R member". (was I-01) | FR-TIME-08, `timeEntry.create` | 2026-10-25 |
+| D-14 | PM scope is split. **Requesting approvals:** any project where the PM is a member. **Managing project members** (add/remove, portal levels): only projects where they are the project's PM. Owner and Admin keep full access to both. (was I-02) | FR-APP-01, FR-PRJ-05, FR-CON-04 | 2026-10-25 |
+| D-15 | Line tax is calculated on the line subtotal *after* it is rounded to the currency's decimals; the tax amount is then rounded half-up to the currency's decimals. (was I-05) | FR-INV-02, TC-INV-001 | 2026-10-25 |
+| D-16 | Commercial rights come from a client-level flag on the contact, **`commercial_authority`** (boolean), not from project portal levels. It allows accepting proposals, signing contracts and paying invoices for that client. The primary contact gets it by default; Owner, Admin or PM can grant or revoke it. Portal levels (View/Comment/Approve) cover deliverables only. Column added in Phase 2; enforced in Phases 5 and 7. (was I-04) | FR-PROP-04, FR-CTR-02, FR-INV-05, §4.2 | 2026-10-25 |
 
 ### Updated test case: TC-INV-001 (D-03)
 
@@ -22,7 +27,7 @@ The BRD ([BAD-BRD.pdf](BAD-BRD.pdf)) is the source of truth. This file records e
 |---|---|---|---|
 | TC-INV-001 | FR-INV-02, D-03 | Invoice in **USD** with a line: qty 3 × unit price 33.335, tax 16% | `unit_price` stored as `333350` (4 decimals). Line subtotal 3 × 33.335 = 100.005 → rounded half-up to USD decimals = **100.01**. Tax 16% of 100.01 = 16.0016 → **16.00**. Line total **116.01**. Invoice totals are sums of rounded line values. The same line in **JOD** gives 100.005 / 16.001 / 116.006. |
 
-Taking tax on the already-rounded line subtotal is an interpretation (see I-05).
+Tax is taken on the already-rounded line subtotal, as agreed in D-15.
 
 ## Phase changes
 
@@ -44,15 +49,7 @@ Taking tax on the already-rounded line subtotal is an interpretation (see I-05).
 
 ## Interpretations awaiting confirmation
 
-These are built as described, and changing them later is cheap. Please confirm or correct.
-
-| ID | Interpretation | Where | Needed by |
-|---|---|---|---|
-| I-01 (D-09) | PMs may create time entries for members of their projects. FR-TIME-08 ("Admin/PM can create entries for a member") wins over the matrix, which shows PM "R member". | `timeEntry.create` | Phase 6 |
-| I-02 (D-10) | PMs request approvals and manage members only on projects they belong to. For approvals the matrix shows an unscoped ✓ for PM, but PMs cannot read other projects at all. | `approval.request`, `projectMember.manage` | Phases 2/5 |
-| I-03 (D-11) | Email-change confirmation links expire after 24 hours. The BRD gives no limit. | FR-AUTH-13 | — |
-| I-04 | A Client Contact may accept proposals, sign contracts and pay invoices if they hold **Approve** level on at least one project of their client. Portal levels are per project, but proposals exist before a project. | `proposal.accept`, `contract.sign`, `invoice.pay` | Phase 7 |
-| I-05 | Line tax is calculated on the line subtotal *after* rounding it to the currency decimals, then rounded half-up itself (TC-INV-001 above). | FR-INV-02 | Phase 7 |
+None open. I-01…I-05 were answered on 2026-10-25 and are now D-13, D-14, D-11, D-16 and D-15. (IDs D-09 and D-10 were placeholders for I-01/I-02 and are not used.)
 
 ## Deferred test cases
 
