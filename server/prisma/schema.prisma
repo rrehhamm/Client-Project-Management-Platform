@@ -205,6 +205,13 @@ enum PaymentStatus {
   Refunded
 }
 
+enum ScanStatus {
+  Pending
+  Clean
+  Infected
+  Failed
+}
+
 enum NotificationChannel {
   InApp
   Email
@@ -242,6 +249,8 @@ model Workspace {
   next_invoice_number   Int       @default(1)
   proposal_prefix       String    @default("PRO-") @db.VarChar(20)
   next_proposal_number  Int       @default(1)
+  /// BR-FILE-03: bytes of all stored file versions (kept with the upload/purge, checked atomically)
+  storage_used_bytes    BigInt    @default(0)
   /// Owner-requested deletion; hard delete after the 30-day grace (BRD 5.2)
   deletion_scheduled_at DateTime? @db.Timestamptz(3)
   created_at            DateTime  @default(now()) @db.Timestamptz(3)
@@ -283,6 +292,8 @@ model Workspace {
   login_throttles      LoginThrottle[]
   task_checklist_items TaskChecklistItem[]
   project_templates    ProjectTemplate[]
+  file_folders         FileFolder[]
+  comment_attachments  CommentAttachment[]
 
   @@map("workspaces")
 }
@@ -306,6 +317,8 @@ model User {
   default_bill_rate         BigInt?
   /// FR-USER-09: default 40 h/week
   capacity_minutes_per_week Int        @default(2400)
+  /// FR-NOT-03: { "<event>": "in_app" | "email" | "off" }; missing events use the defaults
+  notification_prefs        Json?
   last_login_at             DateTime?  @db.Timestamptz(3)
   deactivated_at            DateTime?  @db.Timestamptz(3)
   created_at                DateTime   @default(now()) @db.Timestamptz(3)
@@ -380,6 +393,7 @@ model Client {
   @@unique([workspace_id, name_normalized])
   @@unique([workspace_id, code_prefix])
   @@index([workspace_id, status])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "clients_name_trgm") // FR-SRCH-01
   @@map("clients")
 }
 
@@ -428,6 +442,8 @@ model ClientContact {
   /// FR-CON-02: at most one primary contact per client
   @@unique([client_id], map: "client_contacts_one_primary_per_client", where: raw("is_primary"))
   @@index([workspace_id, client_id])
+  @@index([full_name(ops: raw("gin_trgm_ops"))], type: Gin, map: "client_contacts_name_trgm") // FR-SRCH-01
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin, map: "client_contacts_email_trgm") // FR-SRCH-01
   @@map("client_contacts")
 }
 
@@ -481,6 +497,7 @@ model Project {
   tasks             Task[]
   comments          Comment[]
   files             File[]
+  folders           FileFolder[]
   approval_requests ApprovalRequest[]
   time_entries      TimeEntry[]
   proposal          Proposal?
@@ -493,6 +510,7 @@ model Project {
   @@unique([client_id, name_normalized], map: "projects_name_unique_per_client", where: raw("deleted_at IS NULL"))
   @@index([workspace_id, status])
   @@index([pm_user_id])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "projects_name_trgm") // FR-SRCH-01
   @@map("projects")
 }
 
@@ -614,6 +632,7 @@ model Task {
   @@index([milestone_id])
   @@index([parent_task_id])
   @@index([labels], map: "tasks_labels_gin", type: Gin)
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "tasks_title_trgm") // FR-SRCH-01
   @@map("tasks")
 }
 
@@ -672,6 +691,8 @@ model Comment {
   entity_id         String            @db.Uuid
   author_user_id    String?           @db.Uuid
   author_contact_id String?           @db.Uuid
+  /// FR-COM-06: message-board reply to a top-level project post (one level, D-34)
+  parent_comment_id String?           @db.Uuid
   body              String
   visibility        Visibility        @default(Internal)
   edited_at         DateTime?         @db.Timestamptz(3)
@@ -682,13 +703,17 @@ model Comment {
   updated_by        String?           @db.Uuid
   version           Int               @default(1)
 
-  workspace      Workspace      @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
-  project        Project        @relation(fields: [project_id], references: [id], onDelete: Restrict)
-  author_user    User?          @relation(fields: [author_user_id], references: [id], onDelete: Restrict)
-  author_contact ClientContact? @relation(fields: [author_contact_id], references: [id], onDelete: Restrict)
+  workspace      Workspace           @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  project        Project             @relation(fields: [project_id], references: [id], onDelete: Restrict)
+  author_user    User?               @relation(fields: [author_user_id], references: [id], onDelete: Restrict)
+  author_contact ClientContact?      @relation(fields: [author_contact_id], references: [id], onDelete: Restrict)
+  parent         Comment?            @relation("CommentReplies", fields: [parent_comment_id], references: [id], onDelete: Restrict)
+  replies        Comment[]           @relation("CommentReplies")
+  attachments    CommentAttachment[]
   mentions       Mention[]
 
   @@index([entity_type, entity_id, created_at])
+  @@index([parent_comment_id])
   @@index([project_id])
   @@map("comments")
 }
@@ -745,6 +770,8 @@ model File {
   workspace_id String     @db.Uuid
   project_id   String     @db.Uuid
   task_id      String?    @db.Uuid
+  /// FR-FILE-05: one level of folders per project; null = project root
+  folder_id    String?    @db.Uuid
   name         String     @db.VarChar(255)
   visibility   Visibility @default(Internal)
   deleted_at   DateTime?  @db.Timestamptz(3)
@@ -754,33 +781,43 @@ model File {
   updated_by   String?    @db.Uuid
   version      Int        @default(1)
 
-  workspace Workspace     @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
-  project   Project       @relation(fields: [project_id], references: [id], onDelete: Restrict)
-  task      Task?         @relation(fields: [task_id], references: [id], onDelete: SetNull)
-  versions  FileVersion[]
-  expenses  Expense[]
+  workspace           Workspace           @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  project             Project             @relation(fields: [project_id], references: [id], onDelete: Restrict)
+  task                Task?               @relation(fields: [task_id], references: [id], onDelete: SetNull)
+  folder              FileFolder?         @relation(fields: [folder_id], references: [id], onDelete: SetNull)
+  comment_attachments CommentAttachment[]
+  versions            FileVersion[]
+  expenses            Expense[]
 
   @@index([project_id])
+  @@index([folder_id])
   @@index([task_id])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "files_name_trgm") // FR-SRCH-01
   @@map("files")
 }
 
 /// One uploaded binary. Exactly one uploader column is set (CHECK in migration).
 model FileVersion {
-  id                     String    @id @default(uuid(7)) @db.Uuid
-  workspace_id           String    @db.Uuid
-  file_id                String    @db.Uuid
+  id                     String     @id @default(uuid(7)) @db.Uuid
+  workspace_id           String     @db.Uuid
+  file_id                String     @db.Uuid
   version_no             Int
-  mime_type              String    @db.VarChar(255)
+  /// Name as uploaded (the File name can be renamed later)
+  original_name          String     @db.VarChar(255)
+  mime_type              String     @db.VarChar(255)
   size_bytes             BigInt
-  storage_key            String    @unique @db.VarChar(512)
-  uploaded_by_user_id    String?   @db.Uuid
-  uploaded_by_contact_id String?   @db.Uuid
-  deleted_at             DateTime? @db.Timestamptz(3)
-  created_at             DateTime  @default(now()) @db.Timestamptz(3)
-  created_by             String?   @db.Uuid
-  updated_at             DateTime  @updatedAt @db.Timestamptz(3)
-  updated_by             String?   @db.Uuid
+  /// BR-FILE-02: downloads are allowed only when Clean
+  scan_status            ScanStatus @default(Pending)
+  scanned_at             DateTime?  @db.Timestamptz(3)
+  sha256                 String?    @db.Char(64)
+  storage_key            String     @unique @db.VarChar(512)
+  uploaded_by_user_id    String?    @db.Uuid
+  uploaded_by_contact_id String?    @db.Uuid
+  deleted_at             DateTime?  @db.Timestamptz(3)
+  created_at             DateTime   @default(now()) @db.Timestamptz(3)
+  created_by             String?    @db.Uuid
+  updated_at             DateTime   @updatedAt @db.Timestamptz(3)
+  updated_by             String?    @db.Uuid
 
   workspace           Workspace         @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
   file                File              @relation(fields: [file_id], references: [id], onDelete: Restrict)
@@ -1203,6 +1240,9 @@ model Notification {
   payload      Json?
   channel      NotificationChannel @default(InApp)
   sent_at      DateTime?           @db.Timestamptz(3)
+  /// Email outbox: delivery attempts and the last error (null once sent)
+  attempts     Int                 @default(0)
+  last_error   String?
   read_at      DateTime?           @db.Timestamptz(3)
   created_at   DateTime            @default(now()) @db.Timestamptz(3)
   created_by   String?             @db.Uuid
@@ -1459,4 +1499,45 @@ model TemplateMember {
 
   @@unique([template_id, user_id])
   @@map("template_members")
+}
+
+/// FR-FILE-05: one level of folders per project
+model FileFolder {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  workspace_id    String   @db.Uuid
+  project_id      String   @db.Uuid
+  name            String   @db.VarChar(100)
+  name_normalized String   @db.VarChar(100)
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  created_by      String?  @db.Uuid
+  updated_at      DateTime @updatedAt @db.Timestamptz(3)
+  updated_by      String?  @db.Uuid
+  version         Int      @default(1)
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  project   Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  files     File[]
+
+  @@unique([project_id, name_normalized])
+  @@map("file_folders")
+}
+
+/// FR-COM-01: up to 5 files attached to a comment
+model CommentAttachment {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  workspace_id String   @db.Uuid
+  comment_id   String   @db.Uuid
+  file_id      String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+  created_by   String?  @db.Uuid
+  updated_at   DateTime @updatedAt @db.Timestamptz(3)
+  updated_by   String?  @db.Uuid
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  comment   Comment   @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  file      File      @relation(fields: [file_id], references: [id], onDelete: Cascade)
+
+  @@unique([comment_id, file_id])
+  @@index([file_id])
+  @@map("comment_attachments")
 }
