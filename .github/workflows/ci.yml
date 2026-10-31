@@ -79,8 +79,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Start ClamAV (loads signatures; takes a few minutes)
-        run: docker compose --profile scan up -d --wait --wait-timeout 900 clamav
+      # The API test setup resets the test database, so Postgres and MinIO run too
+      - name: Start ClamAV, Postgres and MinIO (ClamAV loads signatures for a few minutes)
+        run: docker compose --profile scan up -d --wait --wait-timeout 900 postgres minio clamav
 
       - name: EICAR test
         run: npx vitest run src/lib/scanner.clamav.test.js
