@@ -16,13 +16,16 @@ import { RouteErrorPage } from '@/features/system/RouteErrorPage';
 import { SystemStatusPage } from '@/features/system/SystemStatusPage';
 import {
   AccountPage,
+  AuditPage,
   ClientDetailPage,
   ClientsPage,
   MyTasksPage,
   ProjectDetailPage,
   ProjectsPage,
+  SearchPage,
   TeamPage,
   TemplatesPage,
+  WorkTasksPage,
   WorkspaceSettingsPage,
 } from '@/lazyPages';
 
@@ -68,6 +71,9 @@ export const routes = [
               { path: '/projects/:id', element: gated('list_projects', <ProjectDetailPage />) },
               { path: '/my-tasks', element: gated('my_tasks', <MyTasksPage />) },
               { path: '/templates', element: gated('list_templates', <TemplatesPage />) },
+              { path: '/work', element: gated('my_tasks', <WorkTasksPage />) },
+              { path: '/search', element: gated('search', <SearchPage />) },
+              { path: '/audit', element: gated('view_audit', <AuditPage />) },
               { path: '/team', element: gated('manage_team', <TeamPage />) },
               { path: '/settings', element: gated('manage_workspace', <WorkspaceSettingsPage />) },
               { path: '/account', element: <AccountPage /> },

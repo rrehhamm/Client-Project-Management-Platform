@@ -197,6 +197,7 @@ export async function getMe(principal) {
       phone: record.phone,
       timezone: record.timezone,
       version: record.version,
+      has_avatar: Boolean(record.avatar_key), // FR-AUTH-13
       client: principal.kind === 'contact' ? record.client : null,
     },
     workspace: {

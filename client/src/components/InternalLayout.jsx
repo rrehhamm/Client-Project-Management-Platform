@@ -4,6 +4,8 @@ import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useLogout, useMe } from '@/api/auth';
 import { useWorkspace } from '@/api/workspace';
 import { Button } from '@/components/ui/button';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
+import { SearchBox } from '@/features/search/SearchBox';
 import { t } from '@/i18n';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +30,7 @@ export function InternalLayout() {
     { to: '/templates', label: t('nav.templates'), show: caps.list_templates },
     { to: '/team', label: t('nav.team'), show: caps.manage_team },
     { to: '/settings', label: t('nav.settings'), show: caps.manage_workspace },
+    { to: '/audit', label: t('nav.audit'), show: caps.view_audit },
   ].filter((i) => i.show);
 
   const signOut = () => logout.mutate(undefined, { onSettled: () => navigate('/login', { replace: true }) });
@@ -51,6 +54,8 @@ export function InternalLayout() {
             ))}
           </nav>
           <div className="flex items-center gap-1">
+            {caps.search ? <SearchBox /> : null}
+            <NotificationBell />
             <NavLink to="/account" className={navClass} aria-label={t('nav.signedInAs', { name: me.principal.full_name })}>
               <span className="flex items-center gap-2">
                 <UserRound aria-hidden="true" className="size-4" />

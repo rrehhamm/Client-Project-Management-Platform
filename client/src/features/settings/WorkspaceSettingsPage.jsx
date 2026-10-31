@@ -16,6 +16,9 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { t, tList } from '@/i18n';
 import { timeZones } from '@/lib/format';
+import { useStorage } from '@/api/comms';
+import { ProgressBar } from '@/components/ProgressBar';
+import { formatBytes } from '@/features/files/format';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -159,6 +162,25 @@ function LogoCard({ ws }) {
   );
 }
 
+/** BR-FILE-03: storage use against the workspace quota. */
+function StorageCard() {
+  const usage = useStorage();
+  if (usage.isPending || usage.error) return null;
+  const { used_bytes: used, quota_bytes: quota, file_max_bytes: max } = usage.data;
+  const pct = Math.min(100, Math.round((used / quota) * 100));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('settings.storageTitle')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <p className="text-sm">{t('settings.storageBody', { used: formatBytes(used), quota: formatBytes(quota), max: formatBytes(max) })}</p>
+        <ProgressBar value={pct} />
+      </CardContent>
+    </Card>
+  );
+}
+
 export function WorkspaceSettingsPage() {
   const ws = useWorkspace();
   if (ws.isPending) return <LoadingState rows={6} />;
@@ -167,6 +189,7 @@ export function WorkspaceSettingsPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
       <LogoCard ws={ws.data} />
+      <StorageCard />
       <Card>
         <CardContent>
           <SettingsForm key={ws.data.version} ws={ws.data} />

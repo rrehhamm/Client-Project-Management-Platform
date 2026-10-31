@@ -7,7 +7,10 @@ import { formatDateTime } from '@/lib/format';
 function describe(entry) {
   const actor = entry.actor?.name ?? t('activity.system');
   // Action names contain dots ("project.archived"), so look them up literally.
-  return tIn('activity.actions', entry.action, { actor }) ?? t('activity.fallback', { actor, action: entry.action });
+  // Record names captured when the entry was written (comments, files, folders)
+  const title = entry.after?.on_title ?? entry.before?.title ?? '';
+  const name = entry.after?.name ?? entry.before?.name ?? '';
+  return tIn('activity.actions', entry.action, { actor, title, name }) ?? t('activity.fallback', { actor, action: entry.action });
 }
 
 const LABELS = { status: 'projectStatus' };

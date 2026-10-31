@@ -12,6 +12,9 @@ const Projects = load(() => import('@/features/projects/ProjectsPage'), 'Project
 const ProjectDetail = load(() => import('@/features/projects/ProjectDetailPage'), 'ProjectDetailPage');
 const MyTasks = load(() => import('@/features/tasks/MyTasksPage'), 'MyTasksPage');
 const Templates = load(() => import('@/features/templates/TemplatesPage'), 'TemplatesPage');
+const WorkTasks = load(() => import('@/features/dashboard/WorkTasksPage'), 'WorkTasksPage');
+const Search = load(() => import('@/features/search/SearchPage'), 'SearchPage');
+const Audit = load(() => import('@/features/audit/AuditPage'), 'AuditPage');
 const WorkspaceSettings = load(() => import('@/features/settings/WorkspaceSettingsPage'), 'WorkspaceSettingsPage');
 
 const fallback = <LoadingState rows={5} />;
@@ -59,5 +62,20 @@ export const MyTasksPage = () => (
 export const TemplatesPage = () => (
   <Suspense fallback={fallback}>
     <Templates />
+  </Suspense>
+);
+export const WorkTasksPage = () => (
+  <Suspense fallback={fallback}>
+    <WorkTasks />
+  </Suspense>
+);
+export const SearchPage = () => (
+  <Suspense fallback={fallback}>
+    <Search />
+  </Suspense>
+);
+export const AuditPage = () => (
+  <Suspense fallback={fallback}>
+    <Audit />
   </Suspense>
 );

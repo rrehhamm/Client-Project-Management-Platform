@@ -20,13 +20,15 @@ import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { t } from '@/i18n';
 import { formatDate, formatMoney } from '@/lib/format';
 import { useTabParam } from '@/lib/useTabParam';
+import { BoardTab } from '@/features/comments/BoardTab';
+import { FilesTab } from '@/features/files/FilesTab';
 import { TasksTab } from '@/features/tasks/TasksTab';
 import { DuplicateProjectDialog, SaveTemplateDialog } from '@/features/templates/ProjectTemplateDialogs';
 import { MembersTab } from './MembersTab';
 import { MilestonesTab } from './MilestonesTab';
 import { ProjectSettingsForm } from './ProjectSettingsForm';
 
-const TABS = ['overview', 'tasks', 'milestones', 'members', 'activity', 'settings'];
+const TABS = ['overview', 'tasks', 'files', 'board', 'milestones', 'members', 'activity', 'settings'];
 
 /** Button label for a status change (BRD 16.1). */
 function transitionLabel(from, to) {
@@ -273,6 +275,8 @@ export function ProjectDetailPage() {
       <TabPanel label={t(`projects.tabs.${activeTab}`)}>
         {activeTab === 'overview' ? <Overview project={p} me={me} /> : null}
         {activeTab === 'tasks' ? <TasksTab project={p} /> : null}
+        {activeTab === 'files' ? <FilesTab project={p} /> : null}
+        {activeTab === 'board' ? <BoardTab project={p} /> : null}
         {activeTab === 'milestones' ? <MilestonesTab project={p} dateFormat={df} /> : null}
         {activeTab === 'members' ? <MembersTab project={p} /> : null}
         {activeTab === 'activity' ? <ProjectActivity project={p} me={me} /> : null}

@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { t } from '@/i18n';
 import { timeZones } from '@/lib/format';
+import { AvatarForm, NotificationPrefsForm } from './AccountExtras';
 
 const profileFormSchema = z.object({
   full_name: z.string().trim().min(1).max(120),
@@ -137,6 +138,16 @@ export function AccountPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">{t('account.title')}</h1>
+      {me.principal.kind === 'user' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('account.avatar.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AvatarForm me={me} />
+          </CardContent>
+        </Card>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>{t('account.profile.title')}</CardTitle>
@@ -161,6 +172,16 @@ export function AccountPage() {
           <PasswordForm />
         </CardContent>
       </Card>
+      {me.principal.kind === 'user' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('notifications.prefsTitle')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <NotificationPrefsForm />
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

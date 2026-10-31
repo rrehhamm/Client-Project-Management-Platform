@@ -109,6 +109,9 @@ export async function getProjectDetail(viewer, project) {
         assign_self: can(viewer, 'task.assignSelf', ctx),
         save_template: can(viewer, 'template.save', ctx),
         duplicate: can(viewer, 'project.duplicate', ctx),
+        upload_file: can(viewer, 'file.create', ctx), // FR-FILE-01
+        manage_files: can(viewer, 'file.update', ctx), // folders, sharing (FR-FILE-05/07)
+        comment: can(viewer, 'comment.create', ctx),
       },
     },
   });
