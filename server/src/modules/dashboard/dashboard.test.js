@@ -119,3 +119,29 @@ describe('global search (FR-SRCH-01)', () => {
     expect(res.body.groups.projects).toHaveLength(10);
   });
 });
+
+describe('profile photo (FR-AUTH-13) and storage use (BR-FILE-03)', () => {
+  it('a user uploads a PNG photo checked by content; colleagues see it; non-images get 415; removing works', async () => {
+    const png = SAMPLE_FILES.png();
+    const put = await as.TeamMember.agent.put('/api/v1/me/avatar').set('X-CSRF-Token', as.TeamMember.csrf).set('Content-Type', 'image/png').send(png);
+    expect(put.status).toBe(200);
+    expect((await as.TeamMember.get('/api/v1/auth/me')).body.principal.has_avatar).toBe(true);
+    const seen = await as.PM.get(`/api/v1/avatars/${W.users.member.id}`);
+    expect(seen.status).toBe(302);
+    expect((await fetch(seen.headers.location)).status).toBe(200);
+    const exe = await as.TeamMember.agent.put('/api/v1/me/avatar').set('X-CSRF-Token', as.TeamMember.csrf).set('Content-Type', 'image/png').send(SAMPLE_FILES.exe());
+    expect(exe.status).toBe(415);
+    expect((await as.TeamMember.delete('/api/v1/me/avatar')).body.has_avatar).toBe(false);
+    expect((await as.PM.get(`/api/v1/avatars/${W.users.member.id}`)).status).toBe(404);
+    const other = await createWorld('Dash other');
+    expect((await (await other.login(app, 'owner')).get(`/api/v1/avatars/${W.users.pm.id}`)).status).toBe(404);
+  });
+
+  it('Owner/Admin see storage use against the quota; others get 403', async () => {
+    const res = await as.Admin.get('/api/v1/storage');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ used_bytes: expect.any(Number), quota_bytes: expect.any(Number), file_max_bytes: expect.any(Number) });
+    expect((await as.PM.get('/api/v1/storage')).status).toBe(403);
+    expect((await as.TeamMember.get('/api/v1/storage')).status).toBe(403);
+  });
+});

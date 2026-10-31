@@ -238,3 +238,22 @@ describe('edit, folders and delete (FR-FILE-05/06/07)', () => {
     expect((await fetch(url)).status).toBe(404);
   });
 });
+
+describe('project purge (FR-PRJ-11)', () => {
+  it('a project deleted more than 30 days ago is purged with its files: rows, stored objects and quota', async () => {
+    const { purgeDeletedProjects } = await import('../../jobs/purgeDeletedProjects.js');
+    const p = await db.project.create({ data: { workspace_id: W.workspace.id, client_id: W.clients.nova.id, name: `Purge me ${Date.now()}`, name_normalized: `purge me ${Date.now()}`, code: `NOV-8${Math.floor(Math.random() * 90 + 10)}`, status: 'InProgress', billing_type: 'Fixed', start_date: new Date('2026-10-01'), pm_user_id: W.users.pm.id } });
+    await db.projectMember.create({ data: { workspace_id: W.workspace.id, project_id: p.id, user_id: W.users.pm.id, project_role: 'PM' } });
+    const f = (await up(as.PM, p, 'old brief.pdf', SAMPLE_FILES.pdf())).body;
+    await as.PM.post('/api/v1/comments', { entity_type: 'File', entity_id: f.id, body: '<p>Note</p>', attachment_file_ids: [f.id] });
+    const v = await db.fileVersion.findFirst({ where: { file_id: f.id } });
+    const { url } = await getFileUrl(v.storage_key);
+    const before = await usage();
+    await db.project.update({ where: { id: p.id }, data: { deleted_at: new Date(Date.now() - 31 * 86_400_000) } });
+    expect(await purgeDeletedProjects()).toBeGreaterThanOrEqual(1);
+    expect(await db.project.findUnique({ where: { id: p.id } })).toBeNull();
+    expect(await db.file.count({ where: { project_id: p.id } })).toBe(0);
+    expect(await usage()).toBe(before - Number(v.size_bytes));
+    expect((await fetch(url)).status).toBe(404);
+  });
+});

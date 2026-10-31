@@ -114,12 +114,13 @@ describe('POST /auth/login', () => {
 
   it('BR-AUTH-05: contacts without portal access, or of an archived client, cannot sign in', async () => {
     const noAccess = await W.addContact({ portalAccess: false });
+    const stamp = Date.now(); // one value, so name and name_normalized always match
     const archivedClient = await db.client.create({
       data: {
         workspace_id: noAccess.workspace_id,
-        name: `Archived Co ${Date.now()}`,
-        name_normalized: `archived co ${Date.now()}`,
-        code_prefix: `Z${String(Date.now()).slice(-2).replace(/\d/g, (d) => 'ABCDEFGHIJ'[d])}`,
+        name: `Archived Co ${stamp}`,
+        name_normalized: `archived co ${stamp}`,
+        code_prefix: `Z${String(stamp).slice(-2).replace(/\d/g, (d) => 'ABCDEFGHIJ'[d])}`,
         currency: 'JOD',
         status: 'Archived',
       },

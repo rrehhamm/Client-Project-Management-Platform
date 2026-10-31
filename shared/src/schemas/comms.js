@@ -106,7 +106,7 @@ export const fileExtension = (name) => {
   return m ? m[1].toLowerCase() : '';
 };
 
-const fileName = trimmedString(1, 255).refine((v) => !/[\\/\u0000-\u001f]/.test(v), { message: 'File names cannot contain slashes or control characters' });
+const fileName = trimmedString(1, 255).refine((v) => !/[\\/\p{Cc}]/u.test(v), { message: 'File names cannot contain slashes or control characters' });
 
 export const fileUploadQuerySchema = z.object({
   folder_id: uuidSchema.optional(),
