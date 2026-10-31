@@ -173,6 +173,8 @@ function capabilitiesFor(principal) {
     my_tasks: can(principal, 'self.internalApp'),
     list_templates: can(principal, 'template.list'),
     manage_templates: can(principal, 'template.manage'),
+    view_audit: can(principal, 'audit.readAll'), // FR-ACT-02
+    search: can(principal, 'self.internalApp'), // FR-SRCH-01
   };
 }
 

@@ -19,6 +19,11 @@ import { milestonesRouter, projectsRouter } from './modules/projects/routes.js';
 import { workspaceRouter } from './modules/workspace/routes.js';
 import { meRouter, projectTasksRouter, tasksRouter } from './modules/tasks/routes.js';
 import { templatesRouter } from './modules/templates/routes.js';
+import { auditRouter } from './modules/audit/routes.js';
+import { commentsRouter } from './modules/comments/routes.js';
+import { filesRouter, projectFilesRouter } from './modules/files/routes.js';
+import { avatarRouter, avatarsRouter, dashboardRouter, searchRouter, storageRouter } from './modules/misc/routes.js';
+import { followsRouter, notificationsRouter } from './modules/notifications/routes.js';
 
 /**
  * @param {object} [options]
@@ -88,6 +93,18 @@ export function createApp(options = {}) {
   api.use('/me', meRouter);
   api.use('/templates', templatesRouter);
   api.use('/milestones', milestonesRouter);
+  // Phase 4
+  api.use('/projects', projectFilesRouter);
+  api.use('/files', filesRouter);
+  api.use('/comments', commentsRouter);
+  api.use('/me', notificationsRouter);
+  api.use('/me', avatarRouter);
+  api.use('/follows', followsRouter);
+  api.use('/audit', auditRouter);
+  api.use('/dashboard', dashboardRouter);
+  api.use('/search', searchRouter);
+  api.use('/storage', storageRouter);
+  api.use('/avatars', avatarsRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
