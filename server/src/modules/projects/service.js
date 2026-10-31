@@ -17,6 +17,7 @@ import { pick, writeAudit } from '../../lib/audit.js';
 import { db } from '../../lib/db.js';
 import { fromDbDate, toDbDate } from '../../lib/dates.js';
 import { AppError, conflict, fieldError, staleUpdate, transitionNotAllowed } from '../../lib/errors.js';
+import { notify } from '../../lib/notify.js';
 import { applyStructure, snapshotProject, structureFromTemplate } from '../templates/structure.js';
 import { assertTemplateUsable } from '../templates/service.js';
 import { assertWritable, membershipOf, projectInclude, recalculateProgress, toProjectDto, todayForWorkspace } from './common.js';
@@ -43,6 +44,23 @@ const auditView = (p, keys) => {
 
 export async function listProjects(viewer, q) {
   const today = await todayForWorkspace(viewer.workspace_id);
+  const where = projectListWhere(viewer, q, today);
+  const [rows, total] = await Promise.all([
+    db.project.findMany({
+      where,
+      include: projectInclude,
+      // Only due_date is nullable; projects without one sort last
+      orderBy: [q.sort === 'due_date' ? { due_date: { sort: q.order, nulls: 'last' } } : { [q.sort]: q.order }, { id: 'asc' }],
+      skip: (q.page - 1) * q.page_size,
+      take: q.page_size,
+    }),
+    db.project.count({ where }),
+  ]);
+  return { data: rows.map((p) => toProjectDto(p, viewer, { today })), page: q.page, page_size: q.page_size, total };
+}
+
+/** The project list filter. Dashboard cards count with this same filter (FR-DASH-05, TC-DASH-001). */
+export function projectListWhere(viewer, q, today) {
   const and = [{ workspace_id: viewer.workspace_id }, projectScope(viewer)];
   and.push(q.deleted ? { deleted_at: { not: null } } : { deleted_at: null });
   if (q.archived === 'exclude') and.push({ archived_at: null });
@@ -57,20 +75,7 @@ export async function listProjects(viewer, q) {
     and.push({ due_date: { lt: toDbDate(today) }, status: { notIn: [PROJECT_STATUS.COMPLETED, PROJECT_STATUS.CANCELLED] } });
   }
   if (q.q) and.push({ OR: [{ name: { contains: q.q, mode: 'insensitive' } }, { code: { contains: q.q.toUpperCase() } }] });
-
-  const where = { AND: and };
-  const [rows, total] = await Promise.all([
-    db.project.findMany({
-      where,
-      include: projectInclude,
-      // Only due_date is nullable; projects without one sort last
-      orderBy: [q.sort === 'due_date' ? { due_date: { sort: q.order, nulls: 'last' } } : { [q.sort]: q.order }, { id: 'asc' }],
-      skip: (q.page - 1) * q.page_size,
-      take: q.page_size,
-    }),
-    db.project.count({ where }),
-  ]);
-  return { data: rows.map((p) => toProjectDto(p, viewer, { today })), page: q.page, page_size: q.page_size, total };
+  return { AND: and };
 }
 
 export async function getProjectDetail(viewer, project) {
@@ -330,9 +335,28 @@ export async function changeStatus(viewer, project, { status, version }, req) {
       },
       tx,
     );
+    // FR-PRJ-06: internal members hear about the change (contacts: portal, Phase 5)
+    const members = await tx.projectMember.findMany({ where: { project_id: project.id, user_id: { not: null } }, select: { user_id: true } });
+    const label = { NotStarted: 'Not started', InProgress: 'In progress', OnHold: 'On hold', Completed: 'Completed', Cancelled: 'Cancelled' }[status] ?? status;
+    await notify(tx, {
+      workspaceId: project.workspace_id,
+      event: 'project_status',
+      actorId: viewer.id,
+      userIds: members.map((m) => m.user_id),
+      internal: true,
+      entityType: 'Project',
+      entityId: project.id,
+      payload: {
+        title: `${viewer.full_name} changed ${project.code} to ${label}`,
+        subject: `${project.code} · ${project.name}: ${label}`,
+        text: `${viewer.full_name} changed the status of ${project.code} · ${project.name} to ${label}.`,
+        link: `/projects/${project.id}`,
+        actor_name: viewer.full_name,
+        project_code: project.code,
+      },
+    });
     return tx.project.findUniqueOrThrow({ where: { id: project.id }, include: projectInclude });
   });
-  // Notifying members arrives with notifications (Phase 4, FR-NOT-02).
   return getProjectDetail(viewer, after);
 }
 

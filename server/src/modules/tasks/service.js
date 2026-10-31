@@ -1,14 +1,16 @@
 // Tasks: FR-TSK-01…07/09/10/12…14, BR-TSK-01…06, D-23, D-24, D-27, FR-PRJ-07.
 import { ERROR_CODES, TASK_STATUS, USER_STATUS, taskTransition } from '@cpm/shared';
 import { can } from '../../auth/can.js';
+import { projectScope } from '../../auth/scopes.js';
 import { assignmentChangeProblem } from '../../auth/taskAssignment.js';
 import { pick, writeAudit } from '../../lib/audit.js';
 import { db } from '../../lib/db.js';
-import { fromDbDate, toDbDate, workspaceToday } from '../../lib/dates.js';
+import { fromDbDate, toDbDate, workspaceWeek } from '../../lib/dates.js';
 import { AppError, conflict, fieldError, forbidden, staleUpdate, transitionNotAllowed } from '../../lib/errors.js';
 import { cleanRichText } from '../../lib/richText.js';
 import { membershipOf, projectInclude, recalculateProgress, todayForWorkspace } from '../projects/common.js';
 import { POSITION_GAP, assertTasksWritable, bottomPosition, taskCounts, taskInclude, toTaskDto } from './common.js';
+import { followNewTask, taskAssigned, taskStatusChanged } from './notifications.js';
 
 const CLOSED = [TASK_STATUS.DONE, TASK_STATUS.CANCELLED];
 const OPEN = { notIn: CLOSED };
@@ -47,7 +49,7 @@ async function assertMilestone(projectId, milestoneId, client = db) {
   if (!m) throw fieldError('milestone_id', 'Choose a milestone of this project');
 }
 
-async function setAssignees(tx, task, ids, viewer) {
+async function setAssignees(tx, task, ids, viewer, project) {
   const current = await tx.taskAssignee.findMany({ where: { task_id: task.id } });
   const before = new Set(current.map((a) => a.user_id));
   const after = new Set(ids);
@@ -59,6 +61,7 @@ async function setAssignees(tx, task, ids, viewer) {
       data: added.map((user_id) => ({ workspace_id: task.workspace_id, task_id: task.id, user_id, created_by: viewer.id, updated_by: viewer.id })),
     });
   }
+  await taskAssigned(tx, { task, project, userIds: added, viewer }); // FR-NOT-02, FR-NOT-05
   return { before: [...before].sort(), after: [...after].sort(), changed: added.length + removed.length > 0 };
 }
 
@@ -177,7 +180,8 @@ export async function createTask(viewer, ctx, body, req) {
         updated_by: viewer.id,
       },
     });
-    if (assignees.length) await setAssignees(tx, t, assignees, viewer);
+    await followNewTask(tx, t, viewer); // FR-NOT-05: the creator follows
+    if (assignees.length) await setAssignees(tx, t, assignees, viewer, project);
     if (!parent) await recalculateProgress(project.id, tx); // FR-PRJ-07
     await writeAudit(
       { req, action: 'task.created', entityType: 'Task', entityId: t.id, projectId: project.id, clientId: project.client_id, after: { ...auditView(t, AUDITED), parent_task_id: t.parent_task_id, assignee_ids: assignees } },
@@ -185,7 +189,6 @@ export async function createTask(viewer, ctx, body, req) {
     );
     return t;
   });
-  // Notifying assignees arrives with notifications (Phase 4, FR-TSK-03 / FR-NOT-02).
   return detailDto(viewer, created.id, ctx);
 }
 
@@ -224,7 +227,7 @@ export async function updateTask(viewer, ctx, { version, apply_to_subtasks: appl
     if (changes.visibility !== undefined && applyToSubtasks) {
       await tx.task.updateMany({ where: { parent_task_id: task.id, deleted_at: null }, data: { visibility: changes.visibility, updated_by: viewer.id } });
     }
-    const assignment = assigneeIds !== undefined ? await setAssignees(tx, task, assigneeIds, viewer) : null;
+    const assignment = assigneeIds !== undefined ? await setAssignees(tx, task, assigneeIds, viewer, project) : null;
     const after = await tx.task.findUniqueOrThrow({ where: { id: task.id } });
     const changed = AUDITED.filter((k) => k in changes && JSON.stringify(auditView(task, [k])[k]) !== JSON.stringify(auditView(after, [k])[k]));
     if (changed.length || assignment?.changed) {
@@ -305,6 +308,7 @@ export async function changeTaskStatus(viewer, ctx, { status, version, complete_
       },
       tx,
     );
+    await taskStatusChanged(tx, { task, project, from: task.status, to: status, viewer });
   });
   return detailDto(viewer, task.id, ctx);
 }
@@ -442,11 +446,7 @@ const GROUP_LIMIT = 100;
 
 export async function myTasks(viewer) {
   const ws = await db.workspace.findUniqueOrThrow({ where: { id: viewer.workspace_id }, select: { timezone: true, week_start_day: true } });
-  const today = workspaceToday(ws);
-  // End of this week: the day before the next week start (workspace setting)
-  const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
-  const daysLeft = (ws.week_start_day - dow - 1 + 7) % 7;
-  const weekEnd = new Date(Date.parse(`${today}T00:00:00Z`) + daysLeft * 86_400_000).toISOString().slice(0, 10);
+  const { today, weekEnd } = workspaceWeek(ws); // BR-DASH-02
 
   const tasks = await db.task.findMany({
     where: {
@@ -476,3 +476,45 @@ export async function myTasks(viewer) {
   return out;
 }
 
+
+// ---------------------------------------------------------------------------
+// Cross-project task list (FR-DASH-05 drill-down). Dashboard cards count with this
+// same filter, so a card's number always equals the list total (TC-DASH-001).
+// ---------------------------------------------------------------------------
+
+export function workTaskWhere(viewer, q, week) {
+  const and = [
+    { workspace_id: viewer.workspace_id, deleted_at: null },
+    { project: { deleted_at: null, archived_at: null, ...projectScope(viewer) } }, // BR-DASH-01
+  ];
+  if (q.mine) and.push({ project: { pm_user_id: viewer.id } });
+  if (q.open || q.due || q.inactive_assignee) and.push({ status: OPEN });
+  if (q.status) and.push({ status: q.status });
+  if (q.due === 'this_week') and.push({ due_date: { gte: toDbDate(week.weekStart), lte: toDbDate(week.weekEnd) } }); // BR-DASH-02
+  if (q.due === 'overdue') and.push({ due_date: { lt: toDbDate(week.today) } });
+  if (q.inactive_assignee) and.push({ assignees: { some: { user: { status: { not: USER_STATUS.ACTIVE } } } } }); // FR-USER-05
+  return { AND: and };
+}
+
+export async function listWorkTasks(viewer, q) {
+  const ws = await db.workspace.findUniqueOrThrow({ where: { id: viewer.workspace_id }, select: { timezone: true, week_start_day: true } });
+  const week = workspaceWeek(ws);
+  const where = workTaskWhere(viewer, q, week);
+  const [rows, total] = await Promise.all([
+    db.task.findMany({
+      where,
+      include: { ...taskInclude, project: { select: { id: true, code: true, name: true } }, parent: { select: { id: true, title: true } } },
+      orderBy: [{ due_date: { sort: 'asc', nulls: 'last' } }, { priority: 'desc' }, { id: 'asc' }],
+      skip: (q.page - 1) * q.page_size,
+      take: q.page_size,
+    }),
+    db.task.count({ where }),
+  ]);
+  return {
+    data: rows.map((t) => ({ ...toTaskDto(t, viewer, { today: week.today }), project: t.project, parent: t.parent })),
+    page: q.page,
+    page_size: q.page_size,
+    total,
+    week: { start: week.weekStart, end: week.weekEnd },
+  };
+}

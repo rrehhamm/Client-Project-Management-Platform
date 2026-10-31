@@ -10,6 +10,7 @@ import {
   taskPositionSchema,
   taskStatusSchema,
   taskUpdateSchema,
+  workTaskQuerySchema,
 } from '@cpm/shared';
 import { Router } from 'express';
 import { authorize, authorizeFields } from '../../auth/authorize.js';
@@ -54,6 +55,11 @@ projectTasksRouter.get('/:id/labels', authorize('project.read', project), async 
 
 // Under /tasks
 export const tasksRouter = Router();
+
+// FR-DASH-05: tasks across the projects the viewer can see (dashboard drill-down)
+tasksRouter.get('/', authorize('self.internalApp'), validateQuery(workTaskQuerySchema), async (req, res) => {
+  res.json(await service.listWorkTasks(req.principal, req.validQuery));
+});
 
 // Bulk first, so "bulk" is not taken for a task id
 tasksRouter.post('/bulk', authorize('self.internalApp'), validateBody(taskBulkSchema), async (req, res) => {

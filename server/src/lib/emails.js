@@ -88,3 +88,14 @@ export function sendEmailChangeNotice({ to, fullName, workspaceName, newEmail })
   });
   return sendMail({ to, subject: `Email change requested for your ${workspaceName} account`, ...body });
 }
+
+/** FR-NOT-02 notification email, sent by the outbox worker (BR-NOT-02: reply-to the PM for contacts). */
+export function sendNotificationEmail({ to, fullName, workspaceName, subject, paragraphs, link, replyTo }) {
+  const body = render({
+    workspaceName,
+    greetingName: fullName,
+    paragraphs: [...paragraphs, 'You can change which emails you get under Account → Notifications.'],
+    action: link ? { label: 'Open', url: appLink(link) } : null,
+  });
+  return sendMail({ to, subject, replyTo, ...body });
+}
