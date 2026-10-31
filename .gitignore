@@ -4,6 +4,10 @@ coverage/
 .env
 .env.*
 !.env.example
+!deploy/.env.production.example
+
+# Production backups (deploy/backup.sh)
+backups/
 *.log
 .DS_Store
 Thumbs.db
