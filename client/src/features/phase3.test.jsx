@@ -94,7 +94,7 @@ function api(role, permissions, extra = {}) {
 const sent = (fetch, key) =>
   fetch.mock.calls.filter(([url, init = {}]) => `${init.method ?? 'GET'} ${String(url).split('?')[0]}` === key).map(([, init]) => JSON.parse(init.body ?? 'null'));
 
-describe('Project tasks (FR-TSK-09/10)', () => {
+describe('Project tasks (FR-TSK-09)', () => {
   it('lists tasks grouped by milestone with overdue and priority badges', async () => {
     api('PM', PM_PERMS);
     renderRoutes(routes, '/projects/p-a?tab=tasks');
@@ -243,7 +243,7 @@ describe('Task panel (D-24)', () => {
   });
 });
 
-describe('My Tasks (FR-TSK-15)', () => {
+describe('My Tasks (FR-TSK-10)', () => {
   const group = (data) => ({ total: data.length, data });
   it('groups my open tasks by due date and links to each task', async () => {
     api('TeamMember', MEMBER_PERMS, {

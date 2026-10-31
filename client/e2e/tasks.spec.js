@@ -44,7 +44,7 @@ test('a PM plans tasks, completes a parent with subtasks on the board, and reuse
   await quickAdd(page, 'Build');
   await quickAdd(page, 'Launch');
 
-  // FR-TSK-04: a subtask, and "Assign me" + due today for My Tasks (FR-TSK-15)
+  // FR-TSK-04: a subtask, and "Assign me" + due today for My Tasks (FR-TSK-10)
   await page.getByTestId(`task-row-${design}`).getByRole('button', { name: design, exact: true }).click();
   const panel = page.getByRole('dialog');
   await panel.getByRole('textbox', { name: 'Subtasks' }).fill('Wireframes');
@@ -56,7 +56,7 @@ test('a PM plans tasks, completes a parent with subtasks on the board, and reuse
   await expect(panel.getByLabel('Due date')).toHaveValue(TODAY);
   await page.keyboard.press('Escape');
 
-  // FR-TSK-15: it is in My Tasks under Today, and the link opens the task
+  // FR-TSK-10: it is in My Tasks under Today, and the link opens the task
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
   await nav.getByRole('link', { name: 'My tasks' }).click();
   await page.getByRole('region', { name: /Today/ }).getByRole('link', { name: design }).click();

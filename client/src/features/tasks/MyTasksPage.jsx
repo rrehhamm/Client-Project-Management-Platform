@@ -1,4 +1,4 @@
-// FR-TSK-15 My Tasks: open tasks assigned to me across projects, by due date.
+// FR-TSK-10 My Tasks: open tasks assigned to me across projects, by due date.
 import { Link } from 'react-router';
 import { useMe } from '@/api/auth';
 import { useMyTasks } from '@/api/tasks';

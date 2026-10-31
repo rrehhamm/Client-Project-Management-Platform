@@ -1,4 +1,4 @@
-// FR-TSK-09/10/11: project tasks with List, Board and Calendar views, filters,
+// FR-TSK-09/11: project tasks with List, Board and Calendar views, filters,
 // quick add and bulk actions. ?task=<id> opens a task, so tasks can be linked.
 import { TASK_STATUS } from '@cpm/shared';
 import { useState } from 'react';
