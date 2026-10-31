@@ -24,7 +24,8 @@ export default defineConfig({
       command: 'npm run e2e:server -w server',
       cwd: '..',
       url: `http://localhost:${API_PORT}/api/v1/health`,
-      env: { API_PORT, AUTH_RATE_LIMIT_PER_MINUTE: '200', API_RATE_LIMIT_PER_MINUTE: '2000' },
+      // The stub scanner marks uploads clean (and flags EICAR), so files can be opened (D-30)
+      env: { API_PORT, AUTH_RATE_LIMIT_PER_MINUTE: '200', API_RATE_LIMIT_PER_MINUTE: '2000', SCANNER: 'stub' },
       // Never reuse: every run must start from a freshly seeded database
       reuseExistingServer: false,
       timeout: 120_000,
