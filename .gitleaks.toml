@@ -1,0 +1,9 @@
+# Secret scan (NFR-SEC-04). Default rules, plus the development-only placeholders and the
+# deliberately wrong passwords in tests, which are published on purpose.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented development placeholders"
+paths = ['''\.env\.example$''', '''docker-compose\.yml$''']
+regexes = ['''change-me''', '''cpm_dev_password''', '''cpm_minio_dev_secret''', '''Nexa-dev-2026''', '''Wrong-pass-123''', '''Nope-1234567''']
