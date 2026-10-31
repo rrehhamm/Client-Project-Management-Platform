@@ -76,6 +76,20 @@ None open. I-01…I-05 were answered on 2026-10-25 and are now D-13, D-14, D-11,
 - In the List view, drag-to-reorder is offered to PM/Admin/Owner and only when no filter is active (a filtered list hides siblings, so the new position would be unclear).
 - The board also has a status menu on each card, so status changes work by keyboard and screen reader (NFR-A11Y-01).
 
+## Behaviour choices made in Phase 4
+
+- **Notification channels (FR-NOT-03):** "In-app and email", "In-app only" or "Off" per event; every event defaults to in-app and email. Security emails (password reset, sign-in email change) are not listed and always go out. Contacts get in-app and email until their preferences arrive with the portal (Phase 5).
+- **Who is told what:** creators and assignees follow a task; commenters follow what they commented on (on the board: the post). New assignees, people mentioned, followers (comments, task status) and internal project members (project status) are notified. A person mentioned in a comment does not also get the follower notification for it.
+- **Mentions (BR-COM-02):** anyone who can read the item can be mentioned, so Owner, Admin and Finance always can; others must be project members. Mentioning someone else is refused with their name; a PM/Admin/Owner is offered "Add to project".
+- **Comment visibility:** comments on an Internal item stay Internal; a Client comment cannot carry an Internal file; replies to an Internal board post are Internal.
+- **Virus scan timing (D-30):** the upload request waits for the scan. An infected file is refused (422 "A virus was found") and not kept; its uploader is notified. If the scanner is unreachable, the version stays "Scanning" and is retried every minute.
+- **New versions** may have a different file type from the previous version (both must be allowed types).
+- **Downloads are logged** (`file.downloaded`) in the audit log, not in the project activity sentences.
+- **Dashboards:** "Active projects" counts In progress projects. Finance sees the Owner/Admin cards until its own dashboard (FR-DASH-04, D-32). "My projects" lists open projects (not Completed/Cancelled).
+- **Search:** up to 10 results per type and 20 overall, taken in turn from each type so no type crowds out the others. Team Members never get contact results (§4.2).
+- **Production safety:** the API refuses to start in production without `SCANNER=clamav`, with `DEV_MARK_FILES_CLEAN`, with placeholder or identical secrets, or with bcrypt cost below 12.
+- **First Owner:** `create-owner.js` creates an invited Owner and prints a one-time set-password link, so no password is passed on a command line.
+
 ## Engineering requests
 
 | ID | Request | Status |
@@ -100,8 +114,8 @@ Covered now at the `can()` level (unit tests in `server/src/auth/can.test.js`). 
 | ~~FR-PRJ-02/03~~ | Project templates | **Done in Phase 3** (`templates.test.js`, Playwright `tasks.spec.js`) | — |
 | ~~FR-PRJ-07 (live)~~ | Progress recalculated on every task status change | **Done in Phase 3** (`tasks.test.js`) | — |
 | FR-TSK-09 (Gantt) | Gantt/timeline view | Calendar view built (D-25) | Phase 6 |
-| FR-TSK-02/05 (notify) | Assignees notified when assigned or when a task changes | Changes logged in the activity feed now | Phase 4 |
-| FR-PRJ-06 (notify) | Status change notified to members | Change logged now | Phase 4 |
-| FR-PRJ-11 (files) | Purge also removes stored files of purged projects | Database rows purged now | Phase 4 |
-| E2E-05 | Unauthorised attempts recorded in the audit log | Denials are audited (`access.denied`), tested on `/users` | Phase 4 |
+| ~~FR-TSK-02/05 (notify)~~ | Assignees notified when assigned or when a task changes | **Done in Phase 4** (`notifications.test.js`) | — |
+| ~~FR-PRJ-06 (notify)~~ | Status change notified to members | **Done in Phase 4** (`notifications.test.js`) | — |
+| ~~FR-PRJ-11 (files)~~ | Purge also removes stored files of purged projects | **Done in Phase 4** (`files.test.js`) | — |
+| ~~E2E-05~~ | Unauthorised attempts recorded in the audit log | **Done in Phase 4** (`audit.test.js`, Playwright `comms.spec.js`) | — |
 | E2E-07 (part) | Deactivating an employee stops and saves a running timer | — | Phase 6 |

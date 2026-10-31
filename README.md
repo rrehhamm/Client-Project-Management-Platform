@@ -53,6 +53,7 @@ Run from the repo root.
 | `npm run db:deploy -w server` | Apply pending migrations |
 | `npm run db:seed -w server` | Load seed data (safe to re-run) |
 | `npm run db:studio -w server` | Browse the database in Prisma Studio |
+| `docker compose --profile scan up -d` | Also start ClamAV locally (optional, ~1.5 GB RAM); then set `SCANNER=clamav` |
 
 Tests never touch your dev database:
 
@@ -104,7 +105,16 @@ docs/              the BRD
 | Projects, members, milestones, activity, duplicate | `server/src/modules/projects`, `client/src/features/projects` |
 | Tasks: list / board / calendar, subtasks, checklists, dependencies, bulk, My Tasks | `server/src/modules/tasks`, `client/src/features/tasks` |
 | Project templates | `server/src/modules/templates`, `client/src/features/templates` |
-| Nightly jobs (purge projects deleted > 30 days ago) | `server/src/jobs` (node-cron, 03:15 UTC) |
+| Comments, @mentions, message board | `server/src/modules/comments`, `client/src/features/comments` |
+| Notifications: bell, email outbox, preferences, follows | `server/src/modules/notifications`, `server/src/lib/notify.js`, `client/src/features/notifications` |
+| Files: upload, versions, folders, virus scan, signed links | `server/src/modules/files`, `server/src/lib/{fileTypes,scanner,storage}.js`, `client/src/features/files` |
+| Dashboards and the cross-project task list | `server/src/modules/dashboard`, `client/src/features/dashboard` |
+| Global search | `server/src/modules/search`, `client/src/features/search` |
+| Audit log (Owner/Admin) | `server/src/modules/audit`, `client/src/features/audit` |
+| Scheduled jobs: purges (03:15/03:30 UTC), "due tomorrow" (08:00 workspace time), scan retries, email outbox (every 30 s) | `server/src/jobs` |
+| Production deployment | `docker-compose.prod.yml`, `deploy/`, [docs/DEPLOY.md](docs/DEPLOY.md) |
+
+Release documents: [release notes and checklist](docs/RELEASE-NOTES.md), [traceability](docs/TRACEABILITY.md), [security review](docs/SECURITY-REVIEW.md).
 
 ## Conventions
 
@@ -134,4 +144,5 @@ docs/              the BRD
 - **npm 12 install scripts.** npm blocks dependency install scripts unless they are listed in `allowScripts` in the root [package.json](package.json). `bcrypt`, `prisma` and `@prisma/engines` are approved. If you upgrade one of them, run `npm install-scripts approve <pkg>`.
 - **MinIO image.** Official `minio/minio` images are no longer published publicly. Compose uses `pgsty/minio`, a community build of the MinIO source. Any S3-compatible service works: change `S3_*` in `.env`.
 - **Docker on Windows.** Docker Desktop needs WSL2, which needs hardware virtualization (Intel VT-x / AMD-V) turned on in BIOS/UEFI. If `docker info` fails with a 500 error, check with `wsl --status`. After installing Docker, open a new terminal so `docker` is on your PATH.
+- **File uploads stay "Scanning".** Downloads need a virus scan (D-30). Locally, either start ClamAV (`docker compose --profile scan up -d`, then `SCANNER=clamav` in `.env`) or add `DEV_MARK_FILES_CLEAN=true` to `.env` to mark uploads clean without a scan. Production refuses both `SCANNER=none` and that setting. Restart `npm run dev` after changing `.env`.
 - **Port in use.** Change `POSTGRES_PORT`, `MINIO_API_PORT`, `SMTP_PORT`, `MAILPIT_UI_PORT` or `API_PORT` in `.env`.
