@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 // E2E tests run the real API and a production build of the client.
 // The database, storage and mail must be up (npm run setup).
+// The API uses its own database (cpm_e2e), wiped and seeded at the start of every run,
+// so browser tests never write to the dev database.
 // The API runs on its own port, so a running `npm run dev` (port 4000) is not reused.
 // Specs sign in as the same seeded users in parallel, so rate limits are raised for this API only.
 const API_PORT = process.env.E2E_API_PORT ?? '4100';
@@ -19,12 +21,13 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: 'npm run start -w server',
+      command: 'npm run e2e:server -w server',
       cwd: '..',
       url: `http://localhost:${API_PORT}/api/v1/health`,
       env: { API_PORT, AUTH_RATE_LIMIT_PER_MINUTE: '200', API_RATE_LIMIT_PER_MINUTE: '2000' },
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
+      // Never reuse: every run must start from a freshly seeded database
+      reuseExistingServer: false,
+      timeout: 120_000,
     },
     {
       command: 'npm run build && npm run preview',

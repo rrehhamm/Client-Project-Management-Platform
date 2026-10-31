@@ -46,7 +46,7 @@ Run from the repo root.
 | `npm run dev` | API (auto-restart) + Vite dev server |
 | `npm run lint` | ESLint for all packages |
 | `npm test` | Unit + API tests (shared, server, client) |
-| `npm run test:e2e` | Playwright browser tests (needs the services running) |
+| `npm run test:e2e` | Playwright browser tests on their own database (needs the services running) |
 | `npm run build` | Production build of the client |
 | `npm run services:up` / `services:down` | Start / stop Docker services |
 | `npm run db:migrate -w server` | Create a new migration from schema changes (dev only) |
@@ -54,7 +54,10 @@ Run from the repo root.
 | `npm run db:seed -w server` | Load seed data (safe to re-run) |
 | `npm run db:studio -w server` | Browse the database in Prisma Studio |
 
-Server test files run one at a time in path order (seed checks first), so tests that read seeded records such as NOV-001 always see the same state. Server tests use a separate database (`TEST_DATABASE_URL`, must end in `_test`). Each run wipes it, migrates it and seeds it, so tests never touch your dev data. The test suite uses bcrypt cost 4 for speed; outside tests the server refuses a cost below 12. Playwright tests use the dev database and read invitation emails from Mailpit, so `npm run setup` must have run.
+Tests never touch your dev database:
+
+- **API tests** use `TEST_DATABASE_URL` (must end in `_test`). Each run wipes, migrates and seeds it. Every test file builds its own workspace (`server/test/fixtures.js`), so files run in parallel and in shuffled order. The suite uses bcrypt cost 4 for speed; outside tests the server refuses a cost below 12.
+- **Browser tests** (Playwright) start their own API on port 4100 against `E2E_DATABASE_URL` (default: `cpm_e2e`, must end in `_e2e`) and storage bucket `<S3_BUCKET>-e2e`. Each run creates the database if needed, wipes it and seeds it (`npm run e2e:server -w server`). A running `npm run dev` is not used. Invitation emails are read from Mailpit, so the services must be up.
 
 ## Repository layout
 

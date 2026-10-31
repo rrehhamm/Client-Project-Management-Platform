@@ -41,12 +41,6 @@ jobs:
       - name: Unit and API tests
         run: npm test
 
-      - name: Prepare dev database and storage for E2E
-        run: |
-          npm run db:deploy -w server
-          npm run db:seed -w server
-          npm run storage:init -w server
-
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
         working-directory: client

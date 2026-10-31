@@ -14,6 +14,7 @@
     "db:seed": "node prisma/seed.js",
     "db:studio": "prisma studio",
     "storage:init": "node scripts/init-storage.js",
+    "e2e:server": "node scripts/e2e-server.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

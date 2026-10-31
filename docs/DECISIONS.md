@@ -74,8 +74,9 @@ None open. I-01…I-05 were answered on 2026-10-25 and are now D-13, D-14, D-11,
 
 | ID | Request | Status |
 |---|---|---|
-| E-01 | API test files must not depend on running in a fixed order against one shared database. Each file creates its own data, so files can run in any order or in parallel. (Requested 2026-10-25 after Phase 2.) | **Done in Phase 3**: each file builds its own workspace (`server/test/fixtures.js`); files run in parallel and shuffled. Only `prisma/schema.test.js` reads the seed. |
+| E-01 | API test files must not depend on running in a fixed order against one shared database. Each file creates its own data, so files can run in any order or in parallel. (Requested 2026-10-25 after Phase 2.) | **Done in Phase 3**, confirmed 2026-10-31: each file builds its own workspace (`server/test/fixtures.js`); the fixed-order sequencer is gone; `server/vitest.config.js` runs files in parallel with shuffled order. Only `prisma/schema.test.js` reads the seed (read-only). |
 | E-02 | Bundle size: no further splitting needed for now (main bundle ~565 KB / 177 KB gzip). | Closed 2026-10-25 |
+| E-03 | Browser tests must not write to the dev database. (Requested 2026-10-31 after Phase 3.) | **Done** 2026-10-31: Playwright's API uses `cpm_e2e` (wiped and seeded every run, `server/scripts/e2e-server.js`) and bucket `<S3_BUCKET>-e2e`. Leftover E2E records were removed from the dev database (15 projects, 5 clients and their contacts, 3 templates, 5 invited users); their activity-log entries stay, as the log is append-only. |
 
 ## Deferred test cases
 

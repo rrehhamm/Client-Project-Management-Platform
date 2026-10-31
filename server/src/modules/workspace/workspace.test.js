@@ -59,7 +59,7 @@ describe('PATCH /workspace (FR-WS-01, D-21)', () => {
     expect((await as.Admin.patch('/api/v1/workspace', { brand_color: 'blue', version: res.body.version })).status).toBe(422);
     expect((await as.Admin.patch('/api/v1/workspace', { timezone: 'Mars/Base', version: res.body.version })).status).toBe(422);
     expect((await as.Admin.patch('/api/v1/workspace', { name: 'Stale', version: ws.version })).status).toBe(409);
-    // put the seed values back
+    // put this world's original values back for the next test in this file
     await as.Admin.patch('/api/v1/workspace', { brand_color: '#2563EB', date_format: 'DD/MM/YYYY', week_start_day: 0, version: res.body.version });
   });
 

@@ -374,7 +374,7 @@ describe('transfer ownership (BR-ROLE-01)', () => {
     // The old Owner's next request already runs as Admin (BR-ROLE-04)
     expect((await as.Owner.post(`/api/v1/users/${owner.id}/transfer-ownership`, { password: SEED_PASSWORD })).status).toBe(403);
 
-    // Restore the seed state
+    // Hand ownership back, so later tests in this file start from the original Owner
     const newOwner = await loginAs(app, target.email);
     const back = await newOwner.post(`/api/v1/users/${owner.id}/transfer-ownership`, { password: SEED_PASSWORD });
     expect(back.status).toBe(200);
