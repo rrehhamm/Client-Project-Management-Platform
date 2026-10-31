@@ -52,6 +52,24 @@ services:
       timeout: 3s
       retries: 30
 
+  # BR-FILE-02 virus scanner (D-30). Optional locally, because it needs about 1–1.5 GB
+  # of RAM: start it with `docker compose --profile scan up -d` and set SCANNER=clamav.
+  # The first start loads the signature database and takes a few minutes.
+  clamav:
+    image: clamav/clamav:1.5.3
+    profiles: ["scan"]
+    ports:
+      - "${CLAMAV_PORT:-3310}:3310"
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 120s
+
 volumes:
   postgres-data:
   minio-data:
+  clamav-data:

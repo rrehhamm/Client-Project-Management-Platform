@@ -42,7 +42,20 @@ export class ApiClient {
   delete(url) {
     return this.#with(this.agent.delete(url));
   }
+  /** Raw-body file upload, like the browser sends it (FR-FILE-01). */
+  upload(url, buffer, { name, type = 'application/octet-stream', method = 'post' } = {}) {
+    return this.#with(this.agent[method](url)).set('Content-Type', type).set('X-File-Name', encodeURIComponent(name)).send(buffer);
+  }
 }
+
+/** Small valid files for upload tests (BR-FILE-01 checks their first bytes). */
+export const SAMPLE_FILES = {
+  png: () => Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a52b0000000049454e44ae426082', 'hex'),
+  pdf: () => Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n'),
+  txt: (text = 'Meeting notes\nline two\n') => Buffer.from(text),
+  // Windows executables start with "MZ"
+  exe: () => Buffer.concat([Buffer.from('MZ'), Buffer.alloc(200, 0x90)]),
+};
 
 export const client = (app) => new ApiClient(app).init();
 

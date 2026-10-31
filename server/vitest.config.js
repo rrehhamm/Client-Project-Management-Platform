@@ -26,6 +26,11 @@ export default defineConfig({
       // Rate limits are tested with a dedicated app instance.
       AUTH_RATE_LIMIT_PER_MINUTE: '100000',
       API_RATE_LIMIT_PER_MINUTE: '100000',
+      // BR-FILE-02: the stub scanner flags the EICAR test string (D-30)
+      SCANNER: 'stub',
+      DEV_MARK_FILES_CLEAN: 'false',
+      // Small limit so the 413 test does not need 100 MB
+      FILE_MAX_BYTES: '5242880',
     },
   },
 });

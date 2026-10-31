@@ -29,6 +29,18 @@ const schema = z.object({
   SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(600),
   FILE_MAX_BYTES: z.coerce.number().int().positive().default(104_857_600),
   STORAGE_QUOTA_BYTES: z.coerce.number().int().positive().default(53_687_091_200),
+  // Address browsers use for signed links, when it differs from S3_ENDPOINT (production: https://files.example.com)
+  S3_PUBLIC_ENDPOINT: z.union([z.url(), z.literal('')]).optional().default(''),
+
+  // BR-FILE-02 virus scanning (D-30): clamav | stub (tests: flags the EICAR string) | none
+  SCANNER: z.enum(['clamav', 'stub', 'none']).default('none'),
+  CLAMAV_HOST: z.string().default('localhost'),
+  CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
+  // Development only: with no scanner, mark new uploads clean so they can be downloaded
+  DEV_MARK_FILES_CLEAN: bool,
+
+  // Email outbox worker (FR-NOT-02)
+  OUTBOX_INTERVAL_SECONDS: z.coerce.number().int().positive().default(30),
 
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().positive(),
@@ -77,6 +89,12 @@ function load() {
   if (new Set(secrets).size !== secrets.length) {
     throw new Error('Invalid configuration: JWT_ACCESS_SECRET, JWT_REFRESH_SECRET and CSRF_SECRET must all differ');
   }
+  if (env.NODE_ENV === 'production' && env.DEV_MARK_FILES_CLEAN) {
+    throw new Error('Invalid configuration: DEV_MARK_FILES_CLEAN is for development only (D-30)');
+  }
+  if (env.NODE_ENV === 'production' && env.SCANNER !== 'clamav') {
+    throw new Error('Invalid configuration: production needs SCANNER=clamav (BR-FILE-02)');
+  }
   if (env.NODE_ENV === 'production' && secrets.some((s) => s.includes('change-me'))) {
     throw new Error('Invalid configuration: replace the placeholder secrets before running in production');
   }
@@ -99,7 +117,10 @@ function load() {
       signedUrlTtlSeconds: env.SIGNED_URL_TTL_SECONDS,
       fileMaxBytes: env.FILE_MAX_BYTES,
       quotaBytes: env.STORAGE_QUOTA_BYTES,
+      publicEndpoint: env.S3_PUBLIC_ENDPOINT || env.S3_ENDPOINT,
     }),
+    scanner: Object.freeze({ mode: env.SCANNER, host: env.CLAMAV_HOST, port: env.CLAMAV_PORT, devMarkClean: env.DEV_MARK_FILES_CLEAN }),
+    outboxIntervalSeconds: env.OUTBOX_INTERVAL_SECONDS,
     mail: Object.freeze({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
