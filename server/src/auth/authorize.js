@@ -19,6 +19,22 @@ async function recordDenial(req, action, extra = {}) {
   }
 }
 
+// D-34 (b): signed-out calls to private APIs are recorded too, at most
+// SIGNED_OUT_PER_MINUTE per IP, so a scanner cannot flood the log.
+export const SIGNED_OUT_PER_MINUTE = 10;
+const signedOutSeen = new Map(); // ip → { minute, count }
+
+async function recordSignedOut(req, action) {
+  const minute = Math.floor(Date.now() / 60_000);
+  const key = req.ip ?? 'unknown';
+  const seen = signedOutSeen.get(key);
+  const count = seen?.minute === minute ? seen.count + 1 : 1;
+  signedOutSeen.set(key, { minute, count });
+  if (signedOutSeen.size > 10_000) signedOutSeen.clear(); // bounded memory
+  if (count > SIGNED_OUT_PER_MINUTE) return;
+  await recordDenial(req, action, { reason: 'signed_out' });
+}
+
 /**
  * Allow the request only if can(principal, action, ctx).
  * @param {string} action
@@ -29,7 +45,10 @@ async function recordDenial(req, action, extra = {}) {
  */
 export function authorize(action, { load, readAction } = {}) {
   return async (req, _res, next) => {
-    if (!req.principal) throw unauthenticated();
+    if (!req.principal) {
+      await recordSignedOut(req, action);
+      throw unauthenticated();
+    }
     const ctx = load ? await load(req) : {};
     req.ctx = ctx;
     if (can(req.principal, action, ctx)) return next();
