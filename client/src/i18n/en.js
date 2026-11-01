@@ -135,6 +135,7 @@ export const en = {
     },
     tabs: { overview: 'Overview', tasks: 'Tasks', files: 'Files', board: 'Message board', milestones: 'Milestones', members: 'Members', activity: 'Activity', settings: 'Settings' },
     filterManagedByMe: 'Projects you manage',
+    filterActive: 'Active projects: not started, in progress or on hold',
     filterMemberOf: 'Projects you are on',
     overview: {
       tasks: 'Tasks',
@@ -573,6 +574,7 @@ export const en = {
     attach: 'Attach files',
     attachLimit: 'Up to 5 files.',
     removeAttachment: 'Remove {name}',
+    openImage: 'Open image {name}',
     mentionList: 'People you can mention',
     addToProject: 'Add {name} to the project',
     reply: 'Reply',

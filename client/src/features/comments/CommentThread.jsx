@@ -15,6 +15,11 @@ import { Select } from '@/components/ui/select';
 import { t } from '@/i18n';
 import { formatDateTime } from '@/lib/format';
 import { safeHtml } from '@/lib/safeHtml';
+import { ImageAttachment } from './ImageAttachment';
+
+// D-37: these image types show as a thumbnail once the virus scan is done
+const THUMBNAIL_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const isThumbnailable = (a) => a.scan_status === 'Clean' && THUMBNAIL_TYPES.includes(a.mime_type);
 
 const RichComposer = lazy(() => import('./RichComposer'));
 
@@ -89,14 +94,18 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
           <div className="text-sm [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: safeHtml(c.body) }} />
         )}
         {c.attachments.length ? (
-          <ul className="flex flex-wrap gap-2">
+          <ul className="flex flex-wrap items-end gap-2">
             {c.attachments.map((a) => (
               <li key={a.file_id}>
+                {isThumbnailable(a) ? (
+                  <ImageAttachment attachment={a} />
+                ) : (
                 <button type="button" className="flex items-center gap-1 rounded border px-2 py-0.5 text-xs hover:bg-accent disabled:opacity-60" disabled={a.scan_status !== 'Clean'} onClick={() => openAttachment(a)}>
                   <Paperclip aria-hidden="true" className="size-3" />
                   {a.name}
                   {a.scan_status === 'Pending' ? ` (${t('comments.scanning')})` : ''}
                 </button>
+                )}
               </li>
             ))}
           </ul>

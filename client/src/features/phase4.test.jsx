@@ -144,7 +144,7 @@ describe('comments (FR-COM-02/04, TC-COM-002)', () => {
   });
   const TASK = { id: 't1', project_id: 'p-a', parent_task_id: null, milestone: null, title: 'Homepage', description: null, status: 'ToDo', priority: 'Normal', start_date: null, due_date: null, estimate_minutes: null, visibility: 'Internal', is_billable: null, labels: [], assignees: [], has_inactive_assignee: false, is_overdue: false, subtask_count: 0, created_by: 'id-PM', created_at: '2026-10-02T08:00:00.000Z', version: 1, subtasks: [], checklist: [], predecessors: [], successors: [], permissions: { edit_work: true, edit_details: true, change_visibility: true, change_milestone: true, change_billable: true, assign_others: true, assign_self: true, reopen: true, delete: true, move: true, manage_dependencies: true } };
 
-  function taskApi(comments) {
+  function taskApi(comments, extra = {}) {
     return api('PM', {
       'GET /api/v1/projects/p-a': [200, project()],
       'GET /api/v1/projects/p-a/tasks': [200, { data: [TASK], page: 1, page_size: 100, total: 1 }],
@@ -156,6 +156,7 @@ describe('comments (FR-COM-02/04, TC-COM-002)', () => {
       'GET /api/v1/comments': [200, { data: comments, page: 1, page_size: 100, total: comments.length }],
       'GET /api/v1/comments/mentionable': [200, { data: [] }],
       'GET /api/v1/follows': [200, { following: true }],
+      ...extra,
     });
   }
 
@@ -169,6 +170,30 @@ describe('comments (FR-COM-02/04, TC-COM-002)', () => {
     expect(within(screen.getByTestId('comment-c3')).getByText('Comment deleted')).toBeInTheDocument();
     expect(within(screen.getByTestId('comment-c3')).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Following' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('D-37: image attachments show a thumbnail that opens the full image; other files keep the chip', async () => {
+    taskApi(
+      [
+      comment({
+        attachments: [
+          { file_id: 'f-img', name: 'mockup.png', mime_type: 'image/png', scan_status: 'Clean', version_no: 1 },
+          { file_id: 'f-pdf', name: 'brief.pdf', mime_type: 'application/pdf', scan_status: 'Clean', version_no: 1 },
+          { file_id: 'f-new', name: 'fresh.jpg', mime_type: 'image/jpeg', scan_status: 'Pending', version_no: 1 },
+        ],
+      }),
+      ],
+      { 'GET /api/v1/files/f-img/versions/1/url': [200, { url: 'https://files.test/mockup.png?sig=1', inline: true }] },
+    );
+    renderRoutes(routes, '/projects/p-a?tab=tasks&task=t1');
+    const c1 = await screen.findByTestId('comment-c1');
+    const thumb = await within(c1).findByRole('button', { name: 'Open image mockup.png' });
+    await waitFor(() => expect(thumb.querySelector('img')).toHaveAttribute('src', 'https://files.test/mockup.png?sig=1'));
+    expect(within(c1).getByRole('button', { name: 'brief.pdf' })).toBeInTheDocument(); // chip
+    expect(within(c1).getByRole('button', { name: 'fresh.jpg (scanning)' })).toBeDisabled(); // not scanned yet: chip
+    fireEvent.click(thumb);
+    const viewer = await screen.findByRole('dialog', { name: 'mockup.png' });
+    expect(within(viewer).getByRole('img', { name: 'mockup.png' })).toHaveAttribute('src', 'https://files.test/mockup.png?sig=1');
   });
 
   it('TC-COM-002: a script in a comment body is never put into the page', async () => {
