@@ -77,6 +77,8 @@ export const projectListQuerySchema = paginationSchema.extend({
   due_from: isoDateSchema.optional(),
   due_to: isoDateSchema.optional(),
   overdue: flag,
+  /** D-36 active projects (dashboard card, client list column) */
+  active: flag,
   archived: z.enum(['exclude', 'include', 'only']).default('exclude'),
   /** Owner/Admin: the 30-day trash (FR-PRJ-11) */
   deleted: flag,

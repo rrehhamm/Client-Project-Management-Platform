@@ -1,6 +1,6 @@
 // Shared pieces of the projects module: loading a project for authorize(),
 // the archived read-only rule, progress, and the public project shape.
-import { PROJECT_STATUS, TASK_STATUS } from '@cpm/shared';
+import { ACTIVE_PROJECT_STATUSES, PROJECT_STATUS, TASK_STATUS } from '@cpm/shared';
 import { can } from '../../auth/can.js';
 import { db } from '../../lib/db.js';
 import { fromDbDate, workspaceToday } from '../../lib/dates.js';
@@ -31,6 +31,12 @@ export async function loadProjectContext(req, projectId, { includeDeleted = fals
   const membership = await membershipOf(req.principal, project.id);
   return { project, membership, record: project };
 }
+
+/**
+ * D-36: the one definition of an "active" project. The dashboard card, the project
+ * list filter (?active=true) and the client list column (FR-CLI-03) all use it.
+ */
+export const activeProjectWhere = () => ({ deleted_at: null, archived_at: null, status: { in: [...ACTIVE_PROJECT_STATUSES] } });
 
 /** FR-PRJ-10: archived projects are read-only. */
 export function assertWritable(project) {

@@ -39,6 +39,7 @@ export function ProjectsPage() {
   const [overdue, setOverdue] = useState(() => params.get('overdue') === 'true');
   const pmUserId = params.get('pm_user_id') || undefined;
   const memberId = params.get('member_id') || undefined;
+  const activeOnly = params.get('active') === 'true'; // D-36
   const [archived, setArchived] = useState('exclude');
   const [trash, setTrash] = useState(false);
   const [sort, setSort] = useState('created_at');
@@ -47,7 +48,7 @@ export function ProjectsPage() {
   const [notice, setNotice] = useState(null);
   const q = useDebounced(search.trim(), 300);
 
-  const filterKey = [q, clientId, status, overdue, archived, trash, sort, pmUserId, memberId].join('|');
+  const filterKey = [q, clientId, status, overdue, archived, trash, sort, pmUserId, memberId, activeOnly].join('|');
   const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
   const page = pageState.key === filterKey ? pageState.page : 1;
 
@@ -59,6 +60,7 @@ export function ProjectsPage() {
     overdue: overdue || undefined,
     pm_user_id: pmUserId,
     member_id: memberId,
+    active: activeOnly || undefined,
     archived,
     deleted: trash || undefined,
     sort,
@@ -67,7 +69,7 @@ export function ProjectsPage() {
     page_size: PAGE_SIZE,
   });
   const restore = useRestoreProject();
-  const filtersActive = Boolean(q || clientId || status || overdue || archived !== 'exclude' || trash || pmUserId || memberId);
+  const filtersActive = Boolean(q || clientId || status || overdue || archived !== 'exclude' || trash || pmUserId || memberId || activeOnly);
 
   return (
     <div className="space-y-6">
@@ -81,9 +83,9 @@ export function ProjectsPage() {
         {notice ? <Alert variant="success">{notice}</Alert> : null}
         {restore.error ? <Alert variant="destructive">{restore.error.message}</Alert> : null}
       </div>
-      {pmUserId || memberId ? (
+      {pmUserId || memberId || activeOnly ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="rounded-full bg-muted px-3 py-1">{pmUserId ? t('projects.filterManagedByMe') : t('projects.filterMemberOf')}</span>
+          <span className="rounded-full bg-muted px-3 py-1">{activeOnly ? t('projects.filterActive') : pmUserId ? t('projects.filterManagedByMe') : t('projects.filterMemberOf')}</span>
           <Button variant="ghost" size="sm" onClick={() => setParams({}, { replace: true })}>
             {t('common.clearFilter')}
           </Button>

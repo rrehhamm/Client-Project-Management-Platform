@@ -20,7 +20,7 @@ import { AppError, conflict, fieldError, staleUpdate, transitionNotAllowed } fro
 import { notify } from '../../lib/notify.js';
 import { applyStructure, snapshotProject, structureFromTemplate } from '../templates/structure.js';
 import { assertTemplateUsable } from '../templates/service.js';
-import { assertWritable, membershipOf, projectInclude, recalculateProgress, toProjectDto, todayForWorkspace } from './common.js';
+import { activeProjectWhere, assertWritable, membershipOf, projectInclude, recalculateProgress, toProjectDto, todayForWorkspace } from './common.js';
 
 const RESTORE_DAYS = 30; // FR-PRJ-11
 const PM_ROLES = [ROLES.PM, ROLES.ADMIN, ROLES.OWNER]; // D-19
@@ -71,6 +71,7 @@ export function projectListWhere(viewer, q, today) {
   if (q.member_id) and.push({ members: { some: { user_id: q.member_id } } });
   if (q.due_from) and.push({ due_date: { gte: toDbDate(q.due_from) } });
   if (q.due_to) and.push({ due_date: { lte: toDbDate(q.due_to) } });
+  if (q.active === true) and.push(activeProjectWhere()); // D-36
   if (q.overdue === true) {
     and.push({ due_date: { lt: toDbDate(today) }, status: { notIn: [PROJECT_STATUS.COMPLETED, PROJECT_STATUS.CANCELLED] } });
   }

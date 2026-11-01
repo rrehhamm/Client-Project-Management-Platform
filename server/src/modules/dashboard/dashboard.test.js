@@ -50,7 +50,7 @@ describe('dashboards (FR-DASH-01/02/03, BR-DASH-01)', () => {
   it('Owner/Admin: active projects, overdue projects, tasks due this week (workspace week, BR-DASH-02)', async () => {
     const d = (await as.Admin.get('/api/v1/dashboard')).body;
     expect(d.view).toBe('workspace');
-    expect(Object.fromEntries(d.cards.map((c) => [c.key, c.count]))).toEqual({ active_projects: 1, overdue_projects: 1, tasks_due_this_week: 2 });
+    expect(Object.fromEntries(d.cards.map((c) => [c.key, c.count]))).toEqual({ active_projects: 2, overdue_projects: 1, tasks_due_this_week: 2 });
     expect(d.week).toEqual({ start: week.weekStart, end: week.weekEnd, today: week.today });
     expect(d.cards.find((c) => c.key === 'overdue_projects').link).toBe('/projects?overdue=true');
   });
@@ -84,6 +84,33 @@ describe('dashboards (FR-DASH-01/02/03, BR-DASH-01)', () => {
     expect((await as.Contact.get('/api/v1/dashboard')).status).toBe(404);
     const { client } = await import('../../../test/helpers.js');
     expect((await (await client(app)).get('/api/v1/dashboard')).status).toBe(401);
+  });
+});
+
+describe('active projects (D-36, FR-CLI-03)', () => {
+  it('the dashboard card, the project list and the client list column count the same projects', async () => {
+    // One of each status, plus a deleted project that must not count
+    let n = 0;
+    const mk = (status, extra = {}) => {
+      n += 1;
+      const name = `Active check ${status} ${n}`;
+      return db.project.create({ data: { workspace_id: W.workspace.id, client_id: W.clients.nova.id, name, name_normalized: name.toLowerCase(), code: `NOV-7${String(n).padStart(2, '0')}`, status, billing_type: 'Fixed', start_date: new Date('2026-10-01'), pm_user_id: W.users.pm.id, ...extra } });
+    };
+    for (const status of ['NotStarted', 'InProgress', 'OnHold', 'Completed', 'Cancelled']) await mk(status);
+    // (An open project cannot be archived: the database allows archiving only Completed/Cancelled ones)
+    await mk('OnHold', { deleted_at: new Date() });
+
+    const card = (await as.Admin.get('/api/v1/dashboard')).body.cards.find((c) => c.key === 'active_projects');
+    expect(card.link).toBe('/projects?active=true');
+    const list = (await as.Admin.get('/api/v1/projects?active=true&page_size=100')).body;
+    expect(list.total).toBe(card.count);
+    expect(list.data.every((p) => ['NotStarted', 'InProgress', 'OnHold'].includes(p.status) && !p.archived_at)).toBe(true);
+    const clients = (await as.Admin.get('/api/v1/clients?page_size=100')).body.data;
+    expect(clients.reduce((n, c) => n + c.active_projects, 0)).toBe(card.count);
+    for (const c of clients) {
+      expect((await as.Admin.get(`/api/v1/projects?active=true&client_id=${c.id}`)).body.total, c.name).toBe(c.active_projects);
+      expect((await as.Admin.get(`/api/v1/clients/${c.id}`)).body.counts.active_projects, c.name).toBe(c.active_projects);
+    }
   });
 });
 

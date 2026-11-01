@@ -6,13 +6,13 @@ import { revokeAllSessions } from '../../auth/sessions.js';
 import { pick, writeAudit } from '../../lib/audit.js';
 import { db } from '../../lib/db.js';
 import { AppError, conflict, staleUpdate, transitionNotAllowed } from '../../lib/errors.js';
+import { activeProjectWhere } from '../projects/common.js';
 import { suggestPrefix } from './prefix.js';
 
 const normalizeName = (name) => name.trim().toLowerCase();
 const AUDITED = ['name', 'status', 'code_prefix', 'currency', 'default_bill_rate', 'payment_terms_days', 'industry', 'website', 'tax_id'];
 /** BR-CLI-03 */
 const OUTSTANDING_STATUSES = [INVOICE_STATUS.SENT, INVOICE_STATUS.PARTIALLY_PAID, INVOICE_STATUS.OVERDUE];
-const ACTIVE_PROJECT_STATUSES = [PROJECT_STATUS.NOT_STARTED, PROJECT_STATUS.IN_PROGRESS, PROJECT_STATUS.ON_HOLD];
 
 /** Direct status changes (BRD 16.2). Archived only via archive/restore. */
 const CLIENT_TRANSITIONS = {
@@ -91,7 +91,7 @@ export async function listClients(viewer, { page, page_size: pageSize, q, status
       include: detailed
         ? {
             ...primaryContactSelect,
-            _count: { select: { projects: { where: { deleted_at: null, archived_at: null, status: { in: ACTIVE_PROJECT_STATUSES } } } } },
+            _count: { select: { projects: { where: activeProjectWhere() } } }, // D-36
           }
         : undefined,
     }),
@@ -117,7 +117,7 @@ export async function getClientDetail(viewer, client) {
   const [full, balances, projectsActive, projectsTotal, contacts, proposals, contracts, invoices] = await Promise.all([
     db.client.findUniqueOrThrow({ where: { id: client.id }, include: primaryContactSelect }),
     outstandingByClient([client.id]),
-    db.project.count({ where: { client_id: client.id, deleted_at: null, archived_at: null, status: { in: ACTIVE_PROJECT_STATUSES } } }),
+    db.project.count({ where: { client_id: client.id, ...activeProjectWhere() } }), // D-36
     db.project.count({ where: { client_id: client.id, deleted_at: null } }),
     db.clientContact.count({ where: { client_id: client.id } }),
     db.proposal.count({ where: { client_id: client.id } }),

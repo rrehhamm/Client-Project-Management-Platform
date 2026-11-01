@@ -30,6 +30,8 @@ export const PROJECT_STATUS = Object.freeze({
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
 });
+/** D-36: an "active" project is Not Started, In Progress or On Hold (and neither archived nor deleted). */
+export const ACTIVE_PROJECT_STATUSES = Object.freeze([PROJECT_STATUS.NOT_STARTED, PROJECT_STATUS.IN_PROGRESS, PROJECT_STATUS.ON_HOLD]);
 export const BILLING_TYPE = Object.freeze({ FIXED: 'Fixed', HOURLY: 'Hourly', RETAINER: 'Retainer', NON_BILLABLE: 'NonBillable' });
 export const PROJECT_ROLE = Object.freeze({ PM: 'PM', MEMBER: 'Member' });
 

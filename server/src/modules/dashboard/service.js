@@ -33,7 +33,7 @@ export async function dashboard(viewer) {
     // FR-DASH-01 (Finance sees the same until its own dashboard, FR-DASH-04, D-32)
     out.view = 'workspace';
     out.cards = await Promise.all([
-      projectCard('active_projects', { status: PROJECT_STATUS.IN_PROGRESS }),
+      projectCard('active_projects', { active: 'true' }), // D-36: same definition as the client list column
       projectCard('overdue_projects', { overdue: 'true' }),
       taskCard('tasks_due_this_week', { due: 'this_week' }),
     ]);
