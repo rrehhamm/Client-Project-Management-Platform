@@ -1,5 +1,12 @@
 # Release notes
 
+## Unreleased (after v0.4.0-mvp)
+
+- **Notification defaults** (D-35): emails by default only for task assignment, mentions, due tomorrow and security events; everything else in-app. Existing users keep the settings they changed.
+- **Active projects** (D-36): Not Started, In Progress or On Hold, the same on the dashboard and in the client list.
+- **Image attachments** in comments show as thumbnails that open the full image (D-37).
+- **Deployment**: file storage can be the bundled MinIO or any S3-compatible service (D-38); the deployment guide is provider-neutral (D-39).
+
 ## v0.4.0-mvp — internal MVP (2026-11-01)
 
 The first release for internal use: the agency team can run client work end to end with full traceability. Clients do not log in yet (the portal arrives in Phase 5).
@@ -31,10 +38,10 @@ Traceability of every Must requirement: [TRACEABILITY.md](TRACEABILITY.md). Secu
 | 1 | CI green: lint, unit, API, security suite, all Playwright tests incl. E2E-02/05 | ✅ Done (also: ClamAV EICAR job, secret scan, production image build) |
 | 2 | Traceability table: every Must ID → code → test → pass | ✅ Done — [TRACEABILITY.md](TRACEABILITY.md) |
 | 3 | Production build: Dockerfiles, `docker-compose.prod.yml`, Caddy with HTTPS, HSTS and HTTP→HTTPS | ✅ Done — built and run locally; CI builds the images on every push |
-| 4 | Configuration review: no secrets in repo (secret scan in CI), secure cookies, real SMTP, `APP_URL`, CSP, rate limits | ✅ Done — production refuses unsafe settings at start-up. SMTP account still to be chosen (D-29) |
+| 4 | Configuration review: no secrets in repo (secret scan in CI), secure cookies, real SMTP, `APP_URL`, CSP, rate limits | ✅ Done — production refuses unsafe settings at start-up. The SMTP provider is chosen by each installation (D-39) |
 | 5 | First-Owner setup script | ✅ Done — `server/scripts/create-owner.js`, tested on an empty database |
 | 6 | Backups: nightly dump + file copy, restore tried on a scratch machine | ✅ Done — `deploy/backup.sh` / `restore.sh`; full wipe-and-restore rehearsed locally. The off-site copy is set up with the host |
-| 7 | Smoke test on the target | ⏳ **Pending** — host, domain and email provider not chosen yet (D-29) |
+| 7 | Smoke test on the target | ⏳ **Pending** — no paid hosting for now; each company will deploy its own copy (D-39) |
 | 8 | Release notes with known limits, `v0.4.0-mvp` tag | ✅ Done — this file |
 
 ### Upgrading

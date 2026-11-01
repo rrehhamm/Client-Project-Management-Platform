@@ -1,22 +1,30 @@
 # Deploying to one Linux VM
 
-This guide puts the platform on a single Linux server with Docker Compose. Caddy gets HTTPS certificates automatically. The steps were rehearsed end to end on a local machine (see [Rehearsal](#rehearsal)); the smoke test on a real server is still pending (release checklist step 7, D-29).
+This guide installs one copy of the platform for one company (one workspace per installation, D-39) on a single Linux server with Docker Compose. It does not depend on any particular provider. Names such as Hetzner, Brevo and Cloudflare R2 appear only as examples.
 
-**What runs:** Caddy (the only thing reachable from the internet, ports 80/443), the API, PostgreSQL 16, MinIO (file storage) and ClamAV (virus scanning). Everything is defined in [`docker-compose.prod.yml`](../docker-compose.prod.yml).
+The steps were rehearsed end to end on a local machine (see [Rehearsal](#rehearsal)). The smoke test on a real server is still pending (release checklist step 7).
+
+**What runs:**
+- Caddy: the only part reachable from the internet (ports 80/443). It gets HTTPS certificates automatically.
+- The API, PostgreSQL 16 and ClamAV (virus scanning).
+- File storage: either MinIO on the same VM, or an external S3-compatible service.
+
+Everything is defined in [`docker-compose.prod.yml`](../docker-compose.prod.yml).
 
 ## 1. What you need
 
-| Item | Notes |
-|---|---|
-| A Linux VM | Ubuntu 24.04 LTS or similar. **4 GB RAM minimum** (ClamAV alone uses 1–1.5 GB), 2 vCPU, disk for files plus backups (the default quota is 50 GB, OD-07). |
-| Two DNS names | For example `app.example.com` (the app) and `files.example.com` (signed download links). Both need A/AAAA records pointing at the VM. |
-| An SMTP account | Any provider (Postmark, SES, Mailgun, your own server). Invitations, password resets and notifications are sent through it. |
-| Open ports | 80 and 443 (TCP), 443 (UDP for HTTP/3). Keep SSH limited to your IPs. |
+| Item | Requirements | Example |
+|---|---|---|
+| A Linux VM | Any provider or your own hardware; Ubuntu 24.04 LTS or similar with Docker. **4 GB RAM minimum** (ClamAV alone uses 1–1.5 GB), 2 vCPU, disk for the database and backups (plus files, if stored on the VM). | Hetzner Cloud CX32 |
+| A domain name | One DNS A/AAAA record for the app (`app.example.com`). With bundled storage, a second one for files (`files.example.com`). Both point at the VM. | any registrar or DNS host |
+| An SMTP account | Any provider that offers SMTP with a username and password. Used for invitations, password resets and notifications. | Brevo |
+| File storage | **Bundled** (MinIO on the VM, nothing extra to buy) or **external**: any S3-compatible service with a private bucket and an access key limited to it. | Cloudflare R2 |
+| Open ports | 80 and 443 (TCP), 443 (UDP for HTTP/3). Limit SSH to your own IP addresses. | — |
 
 ## 2. Prepare the server
 
 ```sh
-# Docker Engine and the Compose plugin (official repository)
+# Docker Engine and the Compose plugin
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker "$USER"   # log out and in again
 
@@ -26,21 +34,33 @@ sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443 && sudo uf
 
 ## 3. Get the code and settings
 
+Copy the release you were given (a git checkout of tag `v0.4.0-mvp` or the release archive) to the server, then:
+
 ```sh
-git clone https://github.com/rrehhamm/Client-Project-Management-Platform.git cpm
 cd cpm
-git checkout v0.4.0-mvp            # the release you are installing
 cp deploy/.env.production.example .env.production
 chmod 600 .env.production
 ```
 
-Fill in every value in `.env.production`:
+Fill in `.env.production`:
 
-- `APP_DOMAIN`, `FILES_DOMAIN`, `ACME_EMAIL`.
-- `POSTGRES_PASSWORD`, `MINIO_ROOT_PASSWORD`, and the three secrets `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `CSRF_SECRET`. Generate each with `openssl rand -base64 48`; all must be different.
-- The `SMTP_*` values and `MAIL_FROM` from your email provider.
+- **Domain:** `APP_DOMAIN` and `ACME_EMAIL` (certificate notices).
+- **Database and secrets:** `POSTGRES_PASSWORD`, plus the three secrets `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` and `CSRF_SECRET`. Generate each with `openssl rand -base64 48`; all must be different.
+- **Email:** the `SMTP_*` values and `MAIL_FROM` from your SMTP provider.
+- **Storage:** choose one option.
+  - **Bundled (Option A, the default):**
+    - Set `FILES_DOMAIN` and `MINIO_ROOT_PASSWORD` (at least 8 characters).
+    - Keep `STORAGE=bundled` and `COMPOSE_PROFILES=bundled-storage`.
+  - **External (Option B):**
+    - Create a private bucket and an access key that can only read and write that bucket.
+    - Switch the Option A lines off and fill in Option B: `STORAGE=external`, an empty `COMPOSE_PROFILES`, `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `FILES_ORIGIN`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`.
+    - Example for Cloudflare R2: endpoint `https://<account-id>.r2.cloudflarestorage.com`, region `auto`.
 
-The API refuses to start in production if a secret is a placeholder, if the three secrets match, if `BCRYPT_COST` is below 12, if a scanner other than ClamAV is set, or if `DEV_MARK_FILES_CLEAN` is on. That is intended.
+The API refuses to start in production in any of these cases. That is intended.
+- A secret is a placeholder, or the three secrets match.
+- `BCRYPT_COST` is below 12.
+- The scanner is anything other than ClamAV.
+- `DEV_MARK_FILES_CLEAN` is on.
 
 ## 4. Start
 
@@ -49,12 +69,16 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 docker compose -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
-On every start the API applies pending database migrations and creates the storage bucket if needed. Caddy requests certificates as soon as DNS points at the server. ClamAV needs a few minutes on its first start to load its signature database; until then, new uploads show **Scanning** and cannot be downloaded (D-30).
+On every start:
+- The API applies pending database migrations and creates the storage bucket if it is missing. With external storage, create the bucket yourself if the key may not.
+- Caddy requests certificates as soon as DNS points at the server.
+
+ClamAV needs a few minutes on its first start to load its signature database. Until then, new uploads show **Scanning** and cannot be downloaded (D-30).
 
 Check it:
 
 ```sh
-curl -I http://app.example.com          # 308 redirect to https
+curl -I http://app.example.com               # permanent redirect to https
 curl https://app.example.com/api/v1/health   # {"status":"ok"}
 ```
 
@@ -64,17 +88,25 @@ Run this once, on the empty database:
 
 ```sh
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api \
-  node scripts/create-owner.js --email you@agency.com --name "Your Name" \
-  --workspace "Agency name" --timezone Asia/Amman --currency JOD
+  node scripts/create-owner.js --email owner@company.com --name "Full Name" \
+  --workspace "Company name" --timezone Europe/Berlin --currency EUR
 ```
 
-It creates the workspace and the Owner and prints a one-time link (valid 7 days) where the Owner chooses a password; it also emails the link. No password is ever typed on the command line. It refuses to run if the database already has users. Everyone else is invited from **Team** in the app.
+What the script does:
+- Creates the workspace and the Owner.
+- Prints a one-time link, valid 7 days, where the Owner chooses a password, and also emails it. No password is ever typed on the command line.
+- Refuses to run if the database already has users.
 
-Then sign in and set the workspace name, logo, time zone, week start and date format under **Settings**.
+Everyone else is invited from **Team** in the app. After signing in, set the logo, time zone, week start and date format under **Settings**.
 
 ## 6. Backups
 
-[`deploy/backup.sh`](../deploy/backup.sh) writes a PostgreSQL dump and a copy of every stored file to `backups/<UTC time>/`, with checksums, and keeps 14 days. Run it nightly:
+[`deploy/backup.sh`](../deploy/backup.sh) writes the following to `backups/<UTC time>/` and keeps 14 days:
+- A PostgreSQL dump.
+- With bundled storage, a copy of every stored file.
+- Checksums of both.
+
+Run it nightly:
 
 ```sh
 crontab -e
@@ -82,11 +114,15 @@ crontab -e
 30 2 * * * cd /home/USER/cpm && BACKUP_DIR=/home/USER/cpm/backups ./deploy/backup.sh >> backups/backup.log 2>&1
 ```
 
-**Copy the backups off the server** (another region or provider). Disk-level snapshots of the VM are a good extra layer, not a replacement. For example:
+**Copy the backups off the server**, to another provider or region, for example:
 
 ```sh
 rsync -a --delete backups/ backup-host:/srv/cpm-backups/
 ```
+
+Disk snapshots of the VM are a good extra layer, not a replacement.
+
+**External storage:** the files live with the provider, so the script backs up the database only. Turn on the provider's object versioning or replication for the bucket.
 
 To restore (this replaces all current data; the app is offline while it runs):
 
@@ -94,13 +130,18 @@ To restore (this replaces all current data; the app is offline while it runs):
 ./deploy/restore.sh backups/20261101T023000Z
 ```
 
-It checks the checksums, asks you to type `RESTORE`, restores the database and the files, and starts the app again. Try a restore on a scratch VM every few months, so you know it works.
+What the restore does:
+- Checks the checksums and asks you to type `RESTORE`.
+- Restores the database and, with bundled storage, the files.
+- Starts the app again.
+
+Try a restore on a scratch VM every few months, so you know it works.
 
 ## 7. Updating to a new release
 
 ```sh
 ./deploy/backup.sh
-git fetch --tags && git checkout v0.X.Y
+# replace the code with the new release (git checkout of the new tag, or the new archive)
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
@@ -115,23 +156,25 @@ Migrations run automatically when the API starts. Read the release notes first: 
 | Database shell | `... exec postgres psql -U cpm -d cpm` |
 | Storage use | **Settings → File storage** in the app |
 
-Health: `GET /api/v1/health` (process up) and `GET /api/v1/health/ready` (database, storage and email reachable). Point an uptime monitor at both.
+Health checks: `GET /api/v1/health` (process up) and `GET /api/v1/health/ready` (database, storage and email reachable). Point an uptime monitor at both.
 
 ## Security notes
 
-- Only Caddy publishes ports; the database, MinIO and ClamAV are reachable only inside the Docker network.
-- HTTPS everywhere with HSTS, plus CSP, `X-Frame-Options: DENY` and `nosniff` (NFR-SEC-01/05). Plain HTTP gets a permanent redirect (Caddy sends 308, the method-preserving form of 301).
-- File downloads use signed links valid for 10 minutes on `FILES_DOMAIN` (FR-FILE-04). The storage itself is private: unsigned or altered links get 403.
-- Keep `.env.production` readable only by the deploying user (`chmod 600`) and out of git (it is ignored).
+- Only Caddy publishes ports. The database, ClamAV and bundled MinIO are reachable only inside the Docker network.
+- HTTPS everywhere with HSTS, plus CSP, `X-Frame-Options: DENY` and `nosniff` (NFR-SEC-01/05). Plain HTTP gets a permanent redirect: Caddy sends 308, the method-preserving form of 301.
+- File downloads use signed links valid for 10 minutes (FR-FILE-04). The bucket is private, so unsigned or altered links get 403. The content-security policy allows images and previews only from `FILES_ORIGIN`.
+- Keep `.env.production` readable only by the deploying user (`chmod 600`). Never commit it; it is git-ignored.
 
 ## Rehearsal
 
-On 2026-11-01 the whole stack was run on a development machine with `APP_DOMAIN=localhost` and `FILES_DOMAIN=files.localhost` (Caddy's local certificates):
+On 2026-11-01 the whole stack ran on a development machine with bundled storage, `APP_DOMAIN=localhost` and `FILES_DOMAIN=files.localhost` (Caddy's local certificates):
 
-1. Both images built; the API started in production mode and passed the configuration checks.
-2. HTTP redirected to HTTPS; HSTS, CSP, `X-Frame-Options` and `nosniff` were present.
-3. `create-owner.js` created the Owner; the set-password link worked; a second run was refused.
+1. Both images built. The API started in production mode and passed its configuration checks.
+2. HTTP redirected to HTTPS, and HSTS, CSP, `X-Frame-Options` and `nosniff` were present.
+3. `create-owner.js` created the Owner and the set-password link worked. A second run was refused.
 4. A PDF uploaded over HTTPS was scanned by the real ClamAV (Clean) and downloaded through a signed link on the files host. A tampered link and an unsigned request both got 403.
-5. `backup.sh` ran; every volume was destroyed; `restore.sh` brought back the database and the file. The Owner signed in again and the file downloaded with the same size.
+5. After `backup.sh` ran, every volume was destroyed. `restore.sh` brought back the database and the file: the Owner signed in again and the file downloaded at the same size.
 
-Not yet done: the smoke test on the real server (step 7 of the release checklist), after the host, domain and email provider are chosen.
+Since then, external storage was added. Its Compose settings and Caddy configuration are validated, but it has not yet run against a real provider.
+
+Not done yet: the smoke test on a real server (release checklist step 7), which waits until a host is chosen (D-39).
