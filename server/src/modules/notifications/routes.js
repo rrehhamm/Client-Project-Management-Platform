@@ -60,11 +60,13 @@ notificationsRouter.get('/notification-preferences', signedIn, async (req, res) 
 
 notificationsRouter.put('/notification-preferences', signedIn, validateBody(notificationPrefsSchema), async (req, res) => {
   const u = await db.user.findUniqueOrThrow({ where: { id: req.principal.id }, select: { notification_prefs: true } });
+  // D-35: store only what the person chose, so events they never touched follow the defaults
+  const chosen = { ...(u.notification_prefs ?? {}), ...req.body };
   const before = effectivePrefs(u.notification_prefs);
-  const next = { ...before, ...req.body };
-  await db.user.update({ where: { id: req.principal.id }, data: { notification_prefs: next, updated_by: req.principal.id } });
-  await writeAudit({ req, action: 'user.notification_prefs_changed', entityType: 'User', entityId: req.principal.id, before, after: next });
-  res.json({ preferences: next });
+  await db.user.update({ where: { id: req.principal.id }, data: { notification_prefs: chosen, updated_by: req.principal.id } });
+  const after = effectivePrefs(chosen);
+  await writeAudit({ req, action: 'user.notification_prefs_changed', entityType: 'User', entityId: req.principal.id, before, after });
+  res.json({ preferences: after });
 });
 
 // ---------------------------------------------------------------------------

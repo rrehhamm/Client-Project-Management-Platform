@@ -51,7 +51,9 @@ export const NOTIFICATION_EVENTS = Object.freeze([
 ]);
 /** email = in-app and email; in_app = in-app only; off = nothing */
 export const NOTIFICATION_CHANNELS = Object.freeze(['email', 'in_app', 'off']);
-export const DEFAULT_NOTIFICATION_PREFS = Object.freeze(Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e, 'email'])));
+/** D-35: only these events email by default; every other event is in-app only. Security emails are always sent. */
+export const EMAIL_BY_DEFAULT = Object.freeze(['task_assigned', 'mentioned', 'task_due_tomorrow']);
+export const DEFAULT_NOTIFICATION_PREFS = Object.freeze(Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e, EMAIL_BY_DEFAULT.includes(e) ? 'email' : 'in_app'])));
 
 export const notificationPrefsSchema = z
   .object(Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e, z.enum(NOTIFICATION_CHANNELS)])))

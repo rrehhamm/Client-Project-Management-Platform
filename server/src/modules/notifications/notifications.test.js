@@ -95,12 +95,42 @@ describe('the bell (FR-NOT-01)', () => {
 describe('preferences (FR-NOT-03)', () => {
   it('returns every event with its channel; accepts only known events and channels', async () => {
     const res = await as.Finance.get('/api/v1/me/notification-preferences');
-    expect(res.body.preferences).toEqual({ task_assigned: 'email', mentioned: 'email', comment_on_followed: 'email', followed_task_status: 'email', task_due_tomorrow: 'email', project_status: 'email' });
+    // D-35: email only for assignment, mentions and due tomorrow; the rest in-app
+    expect(res.body.preferences).toEqual({ task_assigned: 'email', mentioned: 'email', comment_on_followed: 'in_app', followed_task_status: 'in_app', task_due_tomorrow: 'email', project_status: 'in_app' });
     expect((await as.Finance.put('/api/v1/me/notification-preferences', { task_assigned: 'loud' })).status).toBe(422);
     expect((await as.Finance.put('/api/v1/me/notification-preferences', { password_reset: 'off' })).status).toBe(422); // security emails cannot be turned off
     const saved = await as.Finance.put('/api/v1/me/notification-preferences', { project_status: 'off' });
     expect(saved.body.preferences.project_status).toBe('off');
     expect((await as.Contact.get('/api/v1/me/notification-preferences')).status).toBe(404); // contacts: portal, Phase 5
+  });
+
+  it('D-35: only the settings a person chose are stored; the rest follow the defaults', async () => {
+    await as.Admin.put('/api/v1/me/notification-preferences', { comment_on_followed: 'email' });
+    const stored = (await db.user.findUnique({ where: { id: W.users.admin.id } })).notification_prefs;
+    expect(stored).toEqual({ comment_on_followed: 'email' });
+    const res = await as.Admin.get('/api/v1/me/notification-preferences');
+    expect(res.body.preferences).toMatchObject({ comment_on_followed: 'email', followed_task_status: 'in_app', mentioned: 'email' });
+  });
+
+  it('D-35: by default followers get in-app only; assignees still get an email', async () => {
+    const t = (await as.PM.post(`/api/v1/projects/${A.id}/tasks`, { title: `Defaults ${Date.now()}`, assignee_ids: [W.users.member.id] })).body;
+    expect((await db.notification.findMany({ where: { entity_id: t.id, user_id: W.users.member.id, type: 'task_assigned' } })).map((n) => n.channel).sort()).toEqual(['Email', 'InApp']);
+    await as.TeamMember.post(`/api/v1/tasks/${t.id}/status`, { status: 'InProgress', version: t.version });
+    expect((await db.notification.findMany({ where: { entity_id: t.id, user_id: W.users.pm.id, type: 'followed_task_status' } })).map((n) => n.channel)).toEqual(['InApp']);
+  });
+
+  it('D-35 migration: stored Phase 4 settings keep only real choices', async () => {
+    const sql = (await import('node:fs')).readFileSync(new URL('../../../prisma/migrations/20261101000000_notification_defaults/migration.sql', import.meta.url), 'utf8');
+    const user = await W.addUser({ fullName: 'Migrated' });
+    // Phase 4 stored the whole table; this person turned "project_status" off and later switched "comment_on_followed" back to email
+    const full = { task_assigned: 'email', mentioned: 'email', comment_on_followed: 'email', followed_task_status: 'email', task_due_tomorrow: 'email', project_status: 'off' };
+    await db.user.update({ where: { id: user.id }, data: { notification_prefs: full } });
+    const log = (before, after) => db.activityLog.create({ data: { workspace_id: W.workspace.id, actor_type: 'User', actor_id: user.id, action: 'user.notification_prefs_changed', entity_type: 'User', entity_id: user.id, before, after } });
+    await log({ ...full, project_status: 'email' }, { ...full, comment_on_followed: 'off' });
+    await log({ ...full, comment_on_followed: 'off' }, full);
+    // Run the migration for this user only (other test files run at the same time)
+    await db.$executeRawUnsafe(sql.replace(/;\s*$/, ` AND u."id" = '${user.id}'::uuid;`));
+    expect((await db.user.findUnique({ where: { id: user.id } })).notification_prefs).toEqual({ comment_on_followed: 'email', project_status: 'off' });
   });
 });
 
