@@ -1,6 +1,6 @@
 #!/bin/sh
 # Nightly backup (release checklist step 6): a Postgres dump and a copy of every
-# stored file, in BACKUP_DIR/<UTC timestamp>/. Keeps KEEP_DAYS days (default 14).
+# stored file, in BACKUP_DIR/<UTC timestamp>/. Keeps KEEP_DAYS days (default 30, NFR-BAK-01).
 # Copy the backup folder off the VM too (see docs/DEPLOY.md).
 set -eu
 cd "$(dirname "$0")/.."
@@ -29,5 +29,5 @@ fi
 # Checksums, so a restore can tell a damaged copy
 ( cd "$DEST" && { sha256sum db.dump; find files -type f | sort | xargs -r sha256sum; } > SHA256SUMS )
 
-find "$ROOT" -mindepth 1 -maxdepth 1 -type d -mtime +"${KEEP_DAYS:-14}" -exec rm -rf {} +
+find "$ROOT" -mindepth 1 -maxdepth 1 -type d -mtime +"${KEEP_DAYS:-30}" -exec rm -rf {} +
 echo "Backup written to $DEST ($(du -sh "$DEST" | cut -f1), $(find "$DEST/files" -type f | wc -l | tr -d ' ') files)"

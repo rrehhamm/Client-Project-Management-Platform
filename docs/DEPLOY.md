@@ -101,7 +101,7 @@ Everyone else is invited from **Team** in the app. After signing in, set the log
 
 ## 6. Backups
 
-[`deploy/backup.sh`](../deploy/backup.sh) writes the following to `backups/<UTC time>/` and keeps 14 days:
+[`deploy/backup.sh`](../deploy/backup.sh) writes the following to `backups/<UTC time>/` and keeps 30 days (NFR-BAK-01):
 - A PostgreSQL dump.
 - With bundled storage, a copy of every stored file.
 - Checksums of both.
