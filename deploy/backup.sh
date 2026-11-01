@@ -16,8 +16,15 @@ $COMPOSE exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 
 # Files: every object of every bucket, copied with the MinIO client (mc). Objects
 # are copied as files, so the backup can be restored into any S3-compatible store.
-$COMPOSE run --rm --no-deps -T -v "$DEST_ABS/files:/backup" --entrypoint sh minio -c \
-  'mc alias set src http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc mirror --quiet src /backup'
+# With external storage (STORAGE=external) the provider keeps the files: turn on its
+# versioning or replication instead (docs/DEPLOY.md).
+STORAGE=$(sed -n 's/^STORAGE=//p' .env.production | tail -1)
+if [ "${STORAGE:-bundled}" = "bundled" ]; then
+  $COMPOSE run --rm --no-deps -T -v "$DEST_ABS/files:/backup" --entrypoint sh minio -c \
+    'mc alias set src http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc mirror --quiet src /backup'
+else
+  echo "STORAGE=external: database only; files are backed up by the storage provider."
+fi
 
 # Checksums, so a restore can tell a damaged copy
 ( cd "$DEST" && { sha256sum db.dump; find files -type f | sort | xargs -r sha256sum; } > SHA256SUMS )

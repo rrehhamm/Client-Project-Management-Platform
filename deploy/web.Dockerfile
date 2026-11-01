@@ -13,5 +13,5 @@ COPY client client
 RUN npm run build -w client
 
 FROM caddy:2.11.6-alpine
-COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY deploy/Caddyfile deploy/storage-*.caddy /etc/caddy/
 COPY --from=build /app/client/dist /srv

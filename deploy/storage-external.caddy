@@ -1,0 +1,3 @@
+# STORAGE=external: files live with an S3-compatible provider (for example Cloudflare R2,
+# Backblaze B2, AWS S3, Wasabi). Signed links go straight to the provider, so Caddy
+# serves no files host.

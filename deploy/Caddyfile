@@ -1,6 +1,7 @@
 # Caddy: automatic HTTPS (Let's Encrypt), HTTP → HTTPS redirect and HSTS (NFR-SEC-01),
-# security headers (NFR-SEC-05), the client app, /api → API, and the files host
-# that signed download links point at (FR-FILE-04, S3_PUBLIC_ENDPOINT).
+# security headers (NFR-SEC-05), the client app and /api → API.
+# FILES_ORIGIN is where signed download links point (S3_PUBLIC_ENDPOINT): the bundled
+# MinIO behind this Caddy, or an external S3-compatible service (D-38).
 {
 	email {$ACME_EMAIL}
 }
@@ -14,8 +15,8 @@
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		# Previews and avatars load from the files host; PDFs preview in a frame (FR-FILE-03)
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://{$FILES_DOMAIN}; frame-src https://{$FILES_DOMAIN}; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		# Previews and avatars load from the files origin; PDFs preview in a frame (FR-FILE-03)
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: {$FILES_ORIGIN}; frame-src {$FILES_ORIGIN}; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 
@@ -32,12 +33,5 @@
 	}
 }
 
-# Signed links only: MinIO checks every request's signature, so nothing here is public.
-{$FILES_DOMAIN} {
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options "nosniff"
-		-Server
-	}
-	reverse_proxy minio:9000
-}
+# STORAGE=bundled serves the files host for MinIO; STORAGE=external adds nothing.
+import /etc/caddy/storage-{$STORAGE}.caddy

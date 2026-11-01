@@ -1,6 +1,8 @@
 # Production stack for one Linux VM (D-29). See docs/DEPLOY.md.
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 # Only Caddy is reachable from outside (ports 80 and 443).
+# File storage (D-38): STORAGE=bundled runs MinIO here (COMPOSE_PROFILES=bundled-storage);
+# STORAGE=external uses any S3-compatible provider set in S3_* (no MinIO container).
 name: cpm-prod
 
 x-restart: &restart
@@ -24,11 +26,12 @@ services:
 
   minio:
     <<: *restart
+    profiles: ["bundled-storage"]
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     command: ["minio", "server", "/data"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-cpm-storage}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
     volumes:
       - minio-data:/data
     healthcheck:
@@ -62,10 +65,11 @@ services:
       APP_URL: https://${APP_DOMAIN:?set APP_DOMAIN}
       TRUST_PROXY: "1" # behind Caddy: client IPs come from X-Forwarded-For
       DATABASE_URL: postgresql://${POSTGRES_USER:-cpm}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cpm}
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_ENDPOINT: https://${FILES_DOMAIN:?set FILES_DOMAIN}
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # Bundled MinIO unless S3_* name an external provider (D-38)
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-https://${FILES_DOMAIN:-files.invalid}}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-${MINIO_ROOT_USER:-cpm-storage}}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-${MINIO_ROOT_PASSWORD:-}}
       SCANNER: clamav
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
@@ -76,6 +80,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+        required: false # not started when STORAGE=external
       clamav:
         condition: service_started # uploads wait as "Scanning" until ClamAV is ready
 
@@ -86,7 +91,10 @@ services:
       dockerfile: deploy/web.Dockerfile
     environment:
       APP_DOMAIN: ${APP_DOMAIN}
-      FILES_DOMAIN: ${FILES_DOMAIN}
+      FILES_DOMAIN: ${FILES_DOMAIN:-}
+      # Origin of signed download links, allowed in the content-security policy
+      FILES_ORIGIN: ${FILES_ORIGIN:-https://${FILES_DOMAIN:-files.invalid}}
+      STORAGE: ${STORAGE:-bundled}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
     ports:
       - "80:80"

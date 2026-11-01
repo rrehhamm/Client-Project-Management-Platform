@@ -1,0 +1,10 @@
+# STORAGE=bundled: the files host in front of the MinIO container.
+# Signed links only: MinIO checks every request's signature, so nothing here is public.
+{$FILES_DOMAIN} {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	reverse_proxy minio:9000
+}

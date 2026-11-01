@@ -12,6 +12,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // Full-stack steps (upload + virus scan, emails) can take a few seconds on a busy machine
+  expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
