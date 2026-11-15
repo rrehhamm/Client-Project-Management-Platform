@@ -107,14 +107,42 @@ export async function listComments(viewer, ctx, q) {
   return { data: rows.map((c) => toCommentDto(c, viewer, ctx)), page: q.page, page_size: q.page_size, total };
 }
 
-/** "@" picker (FR-COM-03): active internal members of the project. */
+/** "@" picker (FR-COM-03): active internal members; contacts only for Client comments. */
 export async function mentionable(ctx) {
-  const rows = await db.projectMember.findMany({
-    where: { project_id: ctx.project.id, user_id: { not: null }, user: { status: 'Active' } },
-    include: { user: { select: { id: true, full_name: true, role: true } } },
-    orderBy: { user: { full_name: 'asc' } },
-  });
-  return { data: rows.map((m) => m.user) };
+  const [users, contacts] = await Promise.all([
+    db.projectMember.findMany({
+      where: { project_id: ctx.project.id, user_id: { not: null }, user: { status: 'Active' } },
+      include: { user: { select: { id: true, full_name: true, role: true } } },
+      orderBy: { user: { full_name: 'asc' } },
+    }),
+    ctx.project.portal_enabled
+      ? db.projectMember.findMany({
+          where: { project_id: ctx.project.id, contact_id: { not: null }, contact: { portal_access: true, anonymised_at: null } },
+          include: { contact: { select: { id: true, full_name: true } } },
+          orderBy: { contact: { full_name: 'asc' } },
+        })
+      : [],
+  ]);
+  return { data: users.map((m) => m.user), contacts: contacts.map((m) => m.contact) };
+}
+
+/** FR-COM-03: contacts can be mentioned only in Client comments, and only if they are on the project. */
+async function checkContactMentions(ctx, ids, visibility) {
+  const wanted = [...new Set(ids ?? [])];
+  if (!wanted.length) return [];
+  if (visibility !== 'Client') throw fieldError('mention_contact_ids', 'Client contacts can be mentioned only in comments visible to the client');
+  const rows = await db.projectMember.findMany({ where: { project_id: ctx.project.id, contact_id: { in: wanted }, contact: { portal_access: true, anonymised_at: null } }, select: { contact_id: true } });
+  if (rows.length !== wanted.length) throw fieldError('mention_contact_ids', 'Mention contacts who use the portal for this project');
+  return wanted;
+}
+
+/** Where a contact opens the commented item in the portal. */
+export function portalLinkFor(ctx, commentId) {
+  const base = `/portal/projects/${ctx.project.id}`;
+  const tail = commentId ? `&comment=${commentId}` : '';
+  if (ctx.target.type === 'Task') return `${base}?task=${ctx.target.id}${tail}`;
+  if (ctx.target.type === 'File') return `${base}?tab=files&file=${ctx.target.id}${tail}`;
+  return `${base}?tab=messages${tail}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,20 +196,21 @@ async function checkAttachments(ctx, fileIds, visibility) {
 const mentionLink = (ctx, commentId) => `${ctx.target.link}${ctx.target.link.includes('?') ? '&' : '?'}comment=${commentId}`;
 
 /** Mentioned people and followers hear about a comment; never the author (BR-NOT-01). */
-async function notifyComment(tx, viewer, ctx, comment, { text, mentioned, thread }) {
+async function notifyComment(tx, viewer, ctx, comment, { text, mentioned, mentionedContacts = [], thread }) {
   const internal = comment.visibility !== 'Client';
   const snippet = text.length > 200 ? `${text.slice(0, 197)}…` : text;
   const base = { workspaceId: ctx.project.workspace_id, actorId: viewer.id, internal, entityType: ctx.target.type, entityId: ctx.target.id };
   const payload = (title) => ({ title, subject: title, text: `${viewer.full_name}: "${snippet}"`, link: mentionLink(ctx, comment.id), actor_name: viewer.full_name, project_code: ctx.project.code });
-  await notify(tx, { ...base, event: 'mentioned', userIds: mentioned, payload: payload(`${viewer.full_name} mentioned you on "${ctx.target.title}"`) });
+  // Contacts get portal links and reply to the PM (BR-NOT-02)
+  const pm = internal ? null : await tx.user.findUnique({ where: { id: ctx.project.pm_user_id }, select: { email: true } });
+  const contactPayload = (title) => ({ title, subject: title, text: `${viewer.full_name}: "${snippet}"`, link: portalLinkFor(ctx, comment.id), reply_to: pm?.email });
+  const mentionTitle = `${viewer.full_name} mentioned you on "${ctx.target.title}"`;
+  await notify(tx, { ...base, event: 'mentioned', userIds: mentioned, payload: payload(mentionTitle) });
+  await notify(tx, { ...base, event: 'mentioned', contactIds: mentionedContacts, payload: contactPayload(mentionTitle) });
   const followers = await followersOf(thread.type, thread.id, tx);
-  await notify(tx, {
-    ...base,
-    event: 'comment_on_followed',
-    userIds: followers.userIds.filter((id) => !mentioned.includes(id)),
-    contactIds: followers.contactIds,
-    payload: payload(`${viewer.full_name} commented on "${ctx.target.title}"`),
-  });
+  const commentTitle = `${viewer.full_name} commented on "${ctx.target.title}"`;
+  await notify(tx, { ...base, event: 'comment_on_followed', userIds: followers.userIds.filter((id) => !mentioned.includes(id)), payload: payload(commentTitle) });
+  await notify(tx, { ...base, event: 'comment_on_followed', contactIds: followers.contactIds.filter((id) => !mentionedContacts.includes(id)), payload: contactPayload(commentTitle) });
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +237,7 @@ export async function createComment(viewer, ctx, body, req) {
   }
 
   const mentioned = viewer.kind === 'user' ? await checkMentions(viewer, ctx, body.mention_user_ids) : [];
+  const mentionedContacts = viewer.kind === 'user' ? await checkContactMentions(ctx, body.mention_contact_ids, visibility) : [];
   const attachments = await checkAttachments(ctx, body.attachment_file_ids, visibility);
 
   const created = await db.$transaction(async (tx) => {
@@ -229,16 +259,19 @@ export async function createComment(viewer, ctx, body, req) {
     if (mentioned.length) {
       await tx.mention.createMany({ data: mentioned.map((user_id) => ({ workspace_id: c.workspace_id, comment_id: c.id, user_id, created_by: viewer.id, updated_by: viewer.id })) });
     }
+    if (mentionedContacts.length) {
+      await tx.mention.createMany({ data: mentionedContacts.map((contact_id) => ({ workspace_id: c.workspace_id, comment_id: c.id, contact_id, created_by: viewer.id, updated_by: viewer.id })) });
+    }
     if (attachments.length) {
       await tx.commentAttachment.createMany({ data: attachments.map((file_id) => ({ workspace_id: c.workspace_id, comment_id: c.id, file_id, created_by: viewer.id, updated_by: viewer.id })) });
     }
     // FR-NOT-05: the commenter follows the item (board: the post's thread)
     const thread = ctx.target.type === 'Project' ? { type: parent ? 'Comment' : 'Project', id: parent?.id ?? ctx.project.id } : { type: ctx.target.type, id: ctx.target.id };
     const followAs = ctx.target.type === 'Project' ? { type: 'Comment', id: parent?.id ?? c.id } : thread;
-    await notifyComment(tx, viewer, ctx, c, { text, mentioned, thread });
+    await notifyComment(tx, viewer, ctx, c, { text, mentioned, mentionedContacts, thread });
     await follow(tx, { workspaceId: c.workspace_id, entityType: followAs.type, entityId: followAs.id, userIds: viewer.kind === 'user' ? [viewer.id] : [], contactIds: viewer.kind === 'contact' ? [viewer.id] : [], actorId: viewer.id });
     await writeAudit(
-      { req, action: parent ? 'comment.replied' : 'comment.created', entityType: 'Comment', entityId: c.id, projectId: ctx.project.id, clientId: ctx.project.client_id, after: { on: ctx.target.type, on_id: ctx.target.id, on_title: ctx.target.title, visibility, mentions: mentioned.length, attachments: attachments.length } },
+      { req, action: parent ? 'comment.replied' : 'comment.created', entityType: 'Comment', entityId: c.id, projectId: ctx.project.id, clientId: ctx.project.client_id, after: { on: ctx.target.type, on_id: ctx.target.id, on_title: ctx.target.title, visibility, mentions: mentioned.length + mentionedContacts.length, attachments: attachments.length } },
       tx,
     );
     return c;

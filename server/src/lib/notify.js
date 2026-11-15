@@ -3,7 +3,7 @@
 // outbox rows commit together with the change they describe. The outbox worker
 // (jobs/outbox.js) sends the emails afterwards, so a slow mail server never
 // blocks a request.
-import { DEFAULT_NOTIFICATION_PREFS, NOTIFICATION_EVENTS } from '@cpm/shared';
+import { CONTACT_NOTIFICATION_EVENTS, DEFAULT_CONTACT_NOTIFICATION_PREFS, DEFAULT_NOTIFICATION_PREFS, NOTIFICATION_EVENTS } from '@cpm/shared';
 import { db } from './db.js';
 
 /** The channel a user wants for an event: 'email' (in-app + email), 'in_app' or 'off'. */
@@ -11,6 +11,13 @@ export function channelFor(prefs, event) {
   const value = prefs && typeof prefs === 'object' ? prefs[event] : undefined;
   return value ?? DEFAULT_NOTIFICATION_PREFS[event] ?? 'in_app';
 }
+
+/** A contact's channel for an event (portal settings; unknown events: in-app). */
+export function contactChannelFor(prefs, event) {
+  const value = prefs && typeof prefs === 'object' ? prefs[event] : undefined;
+  return value ?? DEFAULT_CONTACT_NOTIFICATION_PREFS[event] ?? 'in_app';
+}
+export const effectiveContactPrefs = (prefs) => Object.fromEntries(CONTACT_NOTIFICATION_EVENTS.map((e) => [e, contactChannelFor(prefs, e)]));
 
 /** Saved preferences merged over the defaults (FR-NOT-03). */
 export const effectivePrefs = (prefs) => Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e, channelFor(prefs, e)]));
@@ -46,9 +53,17 @@ export async function notify(tx, { workspaceId, event, actorId = null, userIds =
     }
   }
   if (contacts.length) {
-    // Contact preferences arrive with the portal (Phase 5); until then: in-app + email
-    const people = await tx.clientContact.findMany({ where: { id: { in: contacts }, workspace_id: workspaceId }, select: { id: true } });
-    for (const c of people) rows.push({ contact_id: c.id, channel: 'InApp' }, { contact_id: c.id, channel: 'Email' });
+    // Only contacts who can sign in to the portal (FR-CON-05, NFR-PRIV-02), with their own settings
+    const people = await tx.clientContact.findMany({
+      where: { id: { in: contacts }, workspace_id: workspaceId, portal_access: true, anonymised_at: null, client: { archived_at: null } },
+      select: { id: true, notification_prefs: true },
+    });
+    for (const c of people) {
+      const channel = contactChannelFor(c.notification_prefs, event);
+      if (channel === 'off') continue;
+      rows.push({ contact_id: c.id, channel: 'InApp' });
+      if (channel === 'email') rows.push({ contact_id: c.id, channel: 'Email' });
+    }
   }
   if (!rows.length) return 0;
 

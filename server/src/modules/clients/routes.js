@@ -1,5 +1,6 @@
 // /api/v1/clients and /api/v1/contacts — every route goes through authorize().
 import {
+  contactAnonymiseSchema,
   clientCreateSchema,
   clientListQuerySchema,
   clientUpdateSchema,
@@ -16,6 +17,7 @@ import { db } from '../../lib/db.js';
 import { forbidden, notFound } from '../../lib/errors.js';
 import { isUuid, validateBody, validateQuery } from '../../lib/validate.js';
 import * as contacts from './contacts.js';
+import * as portalAccess from './portalAccess.js';
 import * as service from './service.js';
 
 /** ctx for client routes; Team Members also get memberOfClient (name-only access). */
@@ -88,4 +90,24 @@ contactsRouter.patch('/:contactId', authorize('contact.update', { load: loadCont
 contactsRouter.delete('/:contactId', authorize('contact.delete', { load: loadContact }), async (req, res) => {
   await contacts.deleteContact(req.principal, req.ctx.contact, req);
   res.status(204).end();
+});
+
+// FR-CON-03/05: portal access
+contactsRouter.post('/:contactId/invite', authorize('contact.portalAccess', { load: loadContact }), async (req, res) => {
+  res.json(await portalAccess.invite(req.principal, req.ctx.contact, req));
+});
+contactsRouter.post('/:contactId/revoke-portal', authorize('contact.portalAccess', { load: loadContact }), async (req, res) => {
+  res.json(await portalAccess.revoke(req.principal, req.ctx.contact, req));
+});
+contactsRouter.post('/:contactId/restore-portal', authorize('contact.portalAccess', { load: loadContact }), async (req, res) => {
+  res.json(await portalAccess.restore(req.principal, req.ctx.contact, req));
+});
+// NFR-PRIV-02: personal data export and anonymisation (Owner, Admin)
+contactsRouter.get('/:contactId/export', authorize('contact.privacy', { load: loadContact }), async (req, res) => {
+  const data = await portalAccess.exportData(req.principal, req.ctx.contact, req);
+  res.set('Content-Disposition', `attachment; filename="contact-${req.ctx.contact.id}.json"`);
+  res.json(data);
+});
+contactsRouter.post('/:contactId/anonymise', authorize('contact.privacy', { load: loadContact }), validateBody(contactAnonymiseSchema), async (req, res) => {
+  res.json(await portalAccess.anonymise(req.principal, req.ctx.contact, req.body, req));
 });

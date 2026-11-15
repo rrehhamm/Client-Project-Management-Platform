@@ -36,13 +36,25 @@ export async function taskAssigned(tx, { task, project, userIds, viewer }) {
 /** Followers hear about a status change (FR-NOT-02 "status change of followed task"). */
 export async function taskStatusChanged(tx, { task, project, from, to, viewer }) {
   const followers = await followersOf('Task', task.id, tx);
+  const title = `${viewer.full_name} moved "${task.title}" to ${STATUS_LABEL[to] ?? to}`;
+  if (task.visibility === 'Client' && followers.contactIds.length) {
+    // BR-TSK-06: contacts only hear about Client-visible tasks, with a portal link
+    await notify(tx, {
+      workspaceId: task.workspace_id,
+      event: 'followed_task_status',
+      actorId: viewer.id,
+      contactIds: followers.contactIds,
+      entityType: 'Task',
+      entityId: task.id,
+      payload: { title, subject: `${task.title}: ${STATUS_LABEL[to] ?? to}`, text: `"${task.title}" is now ${STATUS_LABEL[to] ?? to}.`, link: `/portal/projects/${task.project_id}?task=${task.id}` },
+    });
+  }
   await notify(tx, {
     workspaceId: task.workspace_id,
     event: 'followed_task_status',
     actorId: viewer.id,
     userIds: followers.userIds,
-    contactIds: followers.contactIds,
-    internal: task.visibility !== 'Client', // BR-TSK-06: contacts only hear about Client-visible tasks
+    internal: true,
     entityType: 'Task',
     entityId: task.id,
     payload: {

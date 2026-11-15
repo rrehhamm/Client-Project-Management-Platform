@@ -177,9 +177,9 @@ const infectedError = () =>
 // Upload (FR-FILE-01) and new version (FR-FILE-02)
 // ---------------------------------------------------------------------------
 
-async function assertTaskOfProject(projectId, taskId) {
+async function assertTaskOfProject(projectId, taskId, { clientOnly = false } = {}) {
   if (!taskId) return;
-  const t = await db.task.findFirst({ where: { id: taskId, project_id: projectId, deleted_at: null }, select: { id: true } });
+  const t = await db.task.findFirst({ where: { id: taskId, project_id: projectId, deleted_at: null, ...(clientOnly ? { visibility: 'Client' } : {}) }, select: { id: true } });
   if (!t) throw fieldError('task_id', 'Choose a task of this project');
 }
 async function assertFolderOfProject(projectId, folderId) {
@@ -206,11 +206,15 @@ async function storeVersion(req, { project, name, size, fileId }) {
 export async function uploadFile(viewer, ctx, query, req) {
   const { project } = ctx;
   assertWritable(project);
-  if (query.visibility && query.visibility !== 'Internal' && !can(viewer, 'file.update', ctx)) {
+  const isContact = viewer.kind === 'contact';
+  if (!isContact && query.visibility && query.visibility !== 'Internal' && !can(viewer, 'file.update', ctx)) {
     throw forbidden('Only the project manager, an Admin or the Owner can share files with the client'); // FR-FILE-07
   }
+  // D-44 (b): a contact's uploads are always Client-visible, never in a folder, only on Client tasks
+  const visibility = isContact ? 'Client' : (query.visibility ?? 'Internal');
+  if (isContact) query = { task_id: query.task_id };
   const { name, size } = uploadHeaders(req);
-  await assertTaskOfProject(project.id, query.task_id);
+  await assertTaskOfProject(project.id, query.task_id, { clientOnly: isContact });
   await assertFolderOfProject(project.id, query.folder_id);
 
   const fileId = randomUUID();
@@ -224,7 +228,7 @@ export async function uploadFile(viewer, ctx, query, req) {
         task_id: query.task_id ?? null,
         folder_id: query.folder_id ?? null,
         name,
-        visibility: query.visibility ?? 'Internal',
+        visibility,
         created_by: viewer.id,
         updated_by: viewer.id,
       },
@@ -246,7 +250,7 @@ export async function uploadFile(viewer, ctx, query, req) {
       },
     });
     await follow(tx, { workspaceId: project.workspace_id, entityType: 'File', entityId: fileId, userIds: viewer.kind === 'user' ? [viewer.id] : [], contactIds: viewer.kind === 'contact' ? [viewer.id] : [], actorId: viewer.id });
-    await writeAudit({ req, action: 'file.uploaded', entityType: 'File', entityId: fileId, projectId: project.id, clientId: project.client_id, after: { name, size_bytes: stored.size, mime_type: stored.mime, visibility: query.visibility ?? 'Internal' } }, tx);
+    await writeAudit({ req, action: 'file.uploaded', entityType: 'File', entityId: fileId, projectId: project.id, clientId: project.client_id, after: { name, size_bytes: stored.size, mime_type: stored.mime, visibility } }, tx);
     return v;
   });
   if ((await scanVersion(version.id)) === 'Infected') throw infectedError();

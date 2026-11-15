@@ -149,7 +149,7 @@ describe('list and detail (FR-CLI-03, FR-CLI-04, FR-CLI-08, BR-CLI-03)', () => {
     await as.PM.patch(`/api/v1/clients/${nova.id}`, { internal_notes: 'Pays late', version: fresh.version });
     expect((await as.PM.get(`/api/v1/clients/${nova.id}`)).body.internal_notes).toBe('Pays late');
     expect((await as.TeamMember.get(`/api/v1/clients/${nova.id}`)).body).toEqual({ id: nova.id, name: 'Nova Retail' });
-    expect((await as.Contact.get(`/api/v1/clients/${nova.id}`)).body).toEqual({ id: nova.id, name: 'Nova Retail' });
+    expect((await as.Contact.get(`/api/v1/clients/${nova.id}`)).status).toBe(404); // D-40: internal API
   });
 
   it('a Team Member cannot open a client they do not work for; a contact gets 404 for another client', async () => {

@@ -8,7 +8,11 @@ const escapeHtml = (s) =>
 
 export const appLink = (path) => new URL(path, config.appUrl).toString();
 
-function render({ workspaceName, greetingName, paragraphs, action }) {
+const SAFE_COLOR = /^#[0-9a-f]{6}$/i;
+
+function render({ workspaceName, greetingName, paragraphs, action, brandColor }) {
+  // FR-PORT-07: the workspace colour on the button; no vendor branding anywhere
+  const color = SAFE_COLOR.test(brandColor ?? '') ? brandColor : '#2563eb';
   const text = [
     `Hello ${greetingName},`,
     '',
@@ -20,7 +24,7 @@ function render({ workspaceName, greetingName, paragraphs, action }) {
   const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">
 <p>Hello ${escapeHtml(greetingName)},</p>
 ${paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('\n')}
-${action ? `<p><a href="${escapeHtml(action.url)}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">${escapeHtml(action.label)}</a></p><p style="font-size:12px;color:#555">Or paste this link into your browser: ${escapeHtml(action.url)}</p>` : ''}
+${action ? `<p><a href="${escapeHtml(action.url)}" style="display:inline-block;padding:10px 16px;background:${color};color:#fff;border-radius:6px;text-decoration:none">${escapeHtml(action.label)}</a></p><p style="font-size:12px;color:#555">Or paste this link into your browser: ${escapeHtml(action.url)}</p>` : ''}
 <p>— ${escapeHtml(workspaceName)}</p></body></html>`;
   return { text, html };
 }
@@ -90,12 +94,29 @@ export function sendEmailChangeNotice({ to, fullName, workspaceName, newEmail })
 }
 
 /** FR-NOT-02 notification email, sent by the outbox worker (BR-NOT-02: reply-to the PM for contacts). */
-export function sendNotificationEmail({ to, fullName, workspaceName, subject, paragraphs, link, replyTo }) {
+export function sendNotificationEmail({ to, fullName, workspaceName, subject, paragraphs, link, replyTo, brandColor }) {
   const body = render({
+    brandColor,
     workspaceName,
     greetingName: fullName,
     paragraphs: [...paragraphs, 'You can change which emails you get under Account → Notifications.'],
     action: link ? { label: 'Open', url: appLink(link) } : null,
   });
   return sendMail({ to, subject, replyTo, ...body });
+}
+
+/** FR-CON-03: portal invitation for a client contact, branded, replying to the inviter (BR-NOT-02). */
+export function sendPortalInviteEmail({ to, fullName, workspaceName, clientName, inviterName, replyTo, token, brandColor }) {
+  const body = render({
+    brandColor,
+    workspaceName,
+    greetingName: fullName,
+    paragraphs: [
+      `${inviterName} invited you to the ${workspaceName} client portal for ${clientName}.`,
+      'There you can follow your projects, see shared files, comment and approve deliverables.',
+      'Set your password to activate your access. This link works once and expires in 7 days.',
+    ],
+    action: { label: 'Set your password', url: appLink(`/accept-invite?token=${token}`) },
+  });
+  return sendMail({ to, subject: `Your ${workspaceName} client portal`, replyTo, ...body });
 }

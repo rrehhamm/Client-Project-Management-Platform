@@ -7,7 +7,7 @@ import { pick, writeAudit } from '../../lib/audit.js';
 import { db } from '../../lib/db.js';
 import { AppError, conflict, staleUpdate } from '../../lib/errors.js';
 import { detectImageType, unsafeSvgReason } from '../../lib/images.js';
-import { deleteObject, getDownloadUrl, putObject } from '../../lib/storage.js';
+import { deleteObject, getFileUrl, putObject } from '../../lib/storage.js';
 
 const SETTINGS_FIELDS = ['name', 'brand_color', 'timezone', 'currency', 'date_format', 'week_start_day'];
 
@@ -26,7 +26,8 @@ export async function toWorkspaceDto(workspace, viewer) {
   const dto = {
     id: workspace.id,
     name: workspace.name,
-    logo_url: workspace.logo_key ? await getDownloadUrl(workspace.logo_key, { inline: true }) : null,
+    // Signed for the public storage address (S3_PUBLIC_ENDPOINT), so it works behind the proxy
+    logo_url: workspace.logo_key ? (await getFileUrl(workspace.logo_key, { inline: true })).url : null,
     brand_color: workspace.brand_color,
     timezone: workspace.timezone,
     currency: workspace.currency,
