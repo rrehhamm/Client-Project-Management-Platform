@@ -1,0 +1,75 @@
+%%{init: {'theme':'base','themeVariables':{'clusterBkg':'#FAFBFD','clusterBorder':'#B8C4D2','lineColor':'#5B6B7C','fontFamily':'Arial','primaryColor':'#E8F0FA','primaryBorderColor':'#2F5D8A','primaryTextColor':'#1B2A3A'}}}%%
+%% CPMP — Sequence Diagrams (one file, three scenarios separated by coloured blocks)
+%% S1 Sign in                          (FR-AUTH-01/02/06/11, BR-AUTH-03/06)
+%% S2 Expired access token → refresh   (FR-AUTH-10, refresh-token rotation and reuse detection)
+%% S3 Out-of-scope record request      (FR-AUTH-04, BR-CLI-01, E2E-05)
+%% Sources: client/src/api/client.js, server/src/auth/{csrf,sessions,authorize,throttle}.js,
+%%          server/src/modules/auth/service.js
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant SPA as React SPA
+    participant API as Express API
+    participant AUTH as Auth layer<br/>(csrf, sessions, can)
+    participant DB as PostgreSQL
+
+    rect rgb(232, 240, 250)
+    Note over U,DB: S1 — Sign in
+    SPA->>API: GET /api/v1/auth/csrf
+    API-->>SPA: Set cookie cpm_csrf (signed token)
+    U->>SPA: Enter email and password
+    SPA->>API: POST /auth/login + X-CSRF-Token
+    API->>AUTH: Check CSRF signature
+    API->>DB: Is this email locked? (login_throttles)
+    alt locked (5 failures in 15 min)
+        API->>DB: Audit auth.login_blocked
+        API-->>SPA: 423 ACCOUNT_LOCKED + Retry-After
+    else not locked
+        API->>DB: Find user or contact by email
+        API->>AUTH: bcrypt compare
+        alt wrong email or password
+            API->>DB: Record failure, audit auth.login_failed
+            API-->>SPA: 401 "Email or password is incorrect"
+        else account deactivated / portal disabled
+            API->>DB: Audit auth.login_denied
+            API-->>SPA: 403 with reason
+        else success
+            API->>DB: Create session (refresh jti hash), set last_login_at, audit
+            API-->>SPA: Set cookies cpm_at (15 min) and cpm_rt (/api/v1/auth only)
+            SPA-->>U: Internal user → /dashboard, contact → /portal
+        end
+    end
+    end
+
+    rect rgb(240, 247, 240)
+    Note over U,DB: S2 — Access token expired, silent refresh
+    SPA->>API: GET /api/v1/projects (expired cpm_at)
+    API->>AUTH: authenticate → no valid principal
+    API-->>SPA: 401
+    SPA->>API: POST /auth/refresh (cpm_rt cookie)
+    API->>DB: Load live session (not revoked, not expired, portal idle ≤ 30 min)
+    alt stored jti hash differs (token reused)
+        API->>DB: Revoke session (refresh_reuse)
+        API-->>SPA: 401 → SPA shows sign-in
+    else jti matches
+        API->>DB: Rotate jti with conditional update
+        API-->>SPA: New cpm_at and cpm_rt cookies
+        SPA->>API: Retry GET /api/v1/projects (once)
+        API-->>SPA: 200 { data, page, page_size, total }
+    end
+    end
+
+    rect rgb(252, 237, 234)
+    Note over U,DB: S3 — Request for a record outside the caller's scope
+    SPA->>API: GET /api/v1/projects/{id of another client}
+    API->>AUTH: authenticate → principal reloaded from session
+    API->>DB: Load project and caller's membership (ctx)
+    API->>AUTH: can(principal, 'project.read', ctx)
+    AUTH-->>API: false
+    API->>DB: Audit access.denied (actor, action, IP)
+    alt caller is a Client Contact
+        API-->>SPA: 404 (existence not revealed)
+    else caller is internal
+        API-->>SPA: 403
+    end
+    end

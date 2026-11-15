@@ -1,0 +1,50 @@
+%%{init: {'theme':'base','themeVariables':{'clusterBkg':'#FAFBFD','clusterBorder':'#B8C4D2','lineColor':'#5B6B7C','fontFamily':'Arial','primaryColor':'#E8F0FA','primaryBorderColor':'#2F5D8A','primaryTextColor':'#1B2A3A'}}}%%
+%% CPMP — High-Level System Architecture (production layout)
+%% Source: docker-compose.prod.yml, deploy/Caddyfile, server/src/app.js, server/src/jobs/index.js, client/src
+flowchart LR
+    classDef ui fill:#E8F0FA,stroke:#2F5D8A,color:#1B2A3A
+    classDef api fill:#2F5D8A,stroke:#1B3A5A,color:#FFFFFF
+    classDef data fill:#F4F4F4,stroke:#777777,color:#333333
+    classDef edge fill:#FFF7E6,stroke:#B7791F,color:#5A3E0A
+
+    U["Browser"]:::ui
+
+    subgraph VM["Linux VM — docker-compose.prod.yml"]
+        direction LR
+        CADDY["Caddy (web)<br/>HTTPS, HSTS, CSP, security headers<br/>serves the built React SPA"]:::edge
+
+        subgraph SPA["React SPA (client/)"]
+            direction TB
+            R1["React Router pages<br/>features/* per module"]:::ui
+            R2["TanStack Query hooks<br/>fetch wrapper: CSRF header,<br/>silent token refresh"]:::ui
+            R1 --> R2
+        end
+
+        subgraph API["Express 5 API (server/) — /api/v1"]
+            direction TB
+            M1["Middleware: request id, pino logs,<br/>helmet, JSON body, cookies"]:::api
+            M2["CSRF check → authenticate (JWT cookie,<br/>session reload) → rate limit"]:::api
+            M3["Module routers<br/>auth, users, workspace, clients, projects,<br/>tasks, templates, comments, files,<br/>notifications, dashboard, search, audit"]:::api
+            M4["authorize() / authorizeFields()<br/>→ can() permission matrix (BRD 4.2)"]:::api
+            M5["Services: business rules,<br/>Zod validation (shared/)"]:::api
+            M6["Prisma ORM"]:::api
+            J["Scheduled jobs (node-cron)<br/>purges, due-tomorrow, rescans,<br/>email outbox every 30 s"]:::api
+            M1 --> M2 --> M3 --> M4 --> M5 --> M6
+        end
+
+        PG[("PostgreSQL 16<br/>constraints, triggers,<br/>append-only activity log")]:::data
+        MINIO[("MinIO (bundled)<br/>or external S3")]:::data
+        AV["ClamAV"]:::data
+    end
+
+    SMTP["SMTP provider"]:::data
+
+    U -- "HTTPS" --> CADDY
+    CADDY -- "static files" --> SPA
+    CADDY -- "/api/* reverse proxy" --> M1
+    M6 --> PG
+    M5 -- "upload / signed URL" --> MINIO
+    M5 -- "scan stream" --> AV
+    J --> PG
+    J -- "send queued emails" --> SMTP
+    U -. "signed download link<br/>(files origin)" .-> MINIO

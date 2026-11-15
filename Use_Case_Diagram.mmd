@@ -1,0 +1,60 @@
+%%{init: {'theme':'base','themeVariables':{'clusterBkg':'#FAFBFD','clusterBorder':'#B8C4D2','lineColor':'#5B6B7C','fontFamily':'Arial'}}}%%
+%% CPMP — Use Case Diagram
+%% Mermaid has no native UML use-case notation: actors are boxes, use cases are rounded nodes inside the
+%% system boundary. "Any internal user" stands for every internal role (Owner, Admin, PM, Team Member,
+%% Finance), so use cases shared by all of them are drawn once.
+%% The system boundary is implied: every rounded node is a CPMP use case (Mermaid cannot keep a
+%% vertical boundary box when nodes inside it link to outside actors).
+%% IDs match the SRS, section 10. Solid = implemented in v0.4.0-mvp. Dashed = planned, not implemented.
+flowchart LR
+    classDef actor fill:#E8F0FA,stroke:#2F5D8A,color:#1B2A3A
+    classDef uc fill:#FFFFFF,stroke:#2F5D8A,color:#1B2A3A
+    classDef planned fill:#FFFFFF,stroke:#999999,color:#777777,stroke-dasharray: 5 5
+
+    INT["Any internal user"]:::actor
+    ADM["Owner / Admin"]:::actor
+    PM["Project Manager"]:::actor
+    TM["Team Member"]:::actor
+    FIN["Finance"]:::actor
+    CC["Client Contact"]:::actor
+    SYS["Scheduler (system)"]:::actor
+
+    UC01(["UC-01 Sign in"]):::uc
+    UC03(["UC-03 Reset forgotten password"]):::uc
+    UC10(["UC-10 Comment and mention"]):::uc
+    UC11(["UC-11 Upload file version"]):::uc
+    UC12(["UC-12 View dashboard and drill down"]):::uc
+    UC02(["UC-02 Invite user / accept invitation"]):::uc
+    UC04(["UC-04 Manage users and roles"]):::uc
+    UC13(["UC-13 Review audit log"]):::uc
+    UC05(["UC-05 Manage clients and contacts"]):::uc
+    UC06(["UC-06 Create project"]):::uc
+    UC07(["UC-07 Change project status"]):::uc
+    UC09(["UC-09 Save and reuse template"]):::uc
+    UC08(["UC-08 Plan and track tasks"]):::uc
+    UCP2(["Log time / timesheet (planned)"]):::planned
+    UCP3(["Create and send invoice (planned)"]):::planned
+    UCP1(["Approve deliverable (planned)"]):::planned
+    UC14(["UC-14 Send due-tomorrow reminders"]):::uc
+
+    INT --- UC01
+    INT --- UC03
+    INT --- UC10
+    INT --- UC11
+    INT --- UC12
+    ADM --- UC02
+    ADM --- UC04
+    ADM --- UC13
+    ADM --- UC05
+    ADM --- UC06
+    PM --- UC05
+    PM --- UC06
+    PM --- UC07
+    PM --- UC09
+    PM --- UC08
+    TM --- UC08
+    TM -.- UCP2
+    FIN -.- UCP3
+    CC --- UC01
+    CC -.- UCP1
+    SYS --- UC14

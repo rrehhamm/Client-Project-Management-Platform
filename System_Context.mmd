@@ -1,0 +1,33 @@
+%%{init: {'theme':'base','themeVariables':{'clusterBkg':'#FAFBFD','clusterBorder':'#B8C4D2','lineColor':'#5B6B7C','fontFamily':'Arial','primaryColor':'#E8F0FA','primaryBorderColor':'#2F5D8A','primaryTextColor':'#1B2A3A'}}}%%
+%% CPMP — System Context Diagram (C4 level 1 style)
+%% Source: README.md, docker-compose.prod.yml, server/src/lib (mailer, storage, scanner), BAD-BRD §3.3/§4.1
+%% Solid lines = implemented in v0.4.0-mvp. Dashed lines = planned (BRD Phase 2/3), not implemented.
+flowchart LR
+    classDef actor fill:#E8F0FA,stroke:#2F5D8A,color:#1B2A3A
+    classDef system fill:#2F5D8A,stroke:#1B3A5A,color:#FFFFFF
+    classDef ext fill:#F4F4F4,stroke:#777777,color:#333333
+    classDef planned fill:#FFFFFF,stroke:#999999,color:#777777,stroke-dasharray: 5 5
+
+    OWN["Owner / Admin<br/>(internal)"]:::actor
+    PM["Project Manager<br/>(internal)"]:::actor
+    TM["Team Member<br/>(internal)"]:::actor
+    FIN["Finance<br/>(internal)"]:::actor
+    CC["Client Contact<br/>(external, portal)"]:::actor
+
+    CPMP(["CPMP<br/>Client Project Management Platform<br/>web app + REST API"]):::system
+
+    SMTP["SMTP email provider<br/>(Mailpit in development)"]:::ext
+    S3["S3-compatible object storage<br/>(MinIO bundled or external)"]:::ext
+    AV["ClamAV virus scanner"]:::ext
+    PAY["Payment gateway<br/>(e.g. Stripe, OD-09)"]:::planned
+
+    OWN -- "workspace settings, users, clients,<br/>projects, audit log" --> CPMP
+    PM -- "clients, projects, milestones,<br/>tasks, templates, files" --> CPMP
+    TM -- "assigned tasks, comments,<br/>files, My Tasks" --> CPMP
+    FIN -- "read projects, user rates,<br/>dashboard (finance features planned)" --> CPMP
+    CC -. "portal home (placeholder);<br/>project view, approvals, payments planned" .-> CPMP
+
+    CPMP -- "invitations, password reset,<br/>notification emails" --> SMTP
+    CPMP -- "file versions, logos, avatars;<br/>10-minute signed links" --> S3
+    CPMP -- "scan each uploaded file version" --> AV
+    CPMP -. "online invoice payment (Phase 3)" .-> PAY

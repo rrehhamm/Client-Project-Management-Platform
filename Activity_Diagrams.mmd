@@ -1,0 +1,72 @@
+%%{init: {'theme':'base','themeVariables':{'clusterBkg':'#FAFBFD','clusterBorder':'#B8C4D2','lineColor':'#5B6B7C','fontFamily':'Arial','primaryColor':'#E8F0FA','primaryBorderColor':'#2F5D8A','primaryTextColor':'#1B2A3A'}}}%%
+%% CPMP — Activity Diagrams for three implemented workflows (one file, one swim-lane group per workflow)
+%% A. Invite and onboard a user   (FR-USER-01, FR-AUTH-07, BR-AUTH-01, D-Phase1 "accepting signs in")
+%% B. Upload a file version         (FR-FILE-01/02, BR-FILE-01/02/03, D-30, Phase 4 behaviour choices)
+%% C. Change a task's status        (FR-TSK-06/07, BR-TSK-02, FR-PRJ-07, D-23, Phase 3 behaviour choices)
+%% Note: Mermaid lays out the last subgraph first, so they are declared C, B, A to read A → C left to right.
+%% Sources: server/src/modules/{users,auth,files,tasks}, docs/DECISIONS.md
+flowchart TB
+    classDef start fill:#2F5D8A,stroke:#2F5D8A,color:#FFFFFF
+    classDef err fill:#FCEDEA,stroke:#B4442C,color:#7A2A1A
+    classDef ok fill:#E7F3EA,stroke:#2E7D4A,color:#1D4D2E
+
+    subgraph C["C. Change a task's status"]
+        direction TB
+        C0((Start)):::start --> C1[User picks a new status<br/>list, board drag or card menu]
+        C1 --> C2{Assigned or own task,<br/>or PM/Admin/Owner?}
+        C2 -- no --> C2x[403]:::err
+        C2 -- yes --> C3{Project Completed,<br/>Cancelled or archived?}
+        C3 -- yes --> C3x[409 Reopen the project first]:::err
+        C3 -- no --> C4{Reopening Done or Cancelled?}
+        C4 -- yes --> C4a{PM, Admin or Owner?}
+        C4a -- no --> C4x[403]:::err
+        C4a -- yes --> C9
+        C4 -- no --> C5{Leaving To Do for In Progress,<br/>In Review or Done?}
+        C5 -- yes --> C6{All predecessors Done?}
+        C6 -- no --> C6x[409 Blocked by: task]:::err
+        C6 -- yes --> C7
+        C5 -- no --> C7{Target is Done?}
+        C7 -- yes --> C8{Open subtasks?}
+        C8 -- yes --> C8x[409 listing subtasks, unless<br/>Complete all subtasks is chosen]:::err
+        C8 -- no --> C9
+        C7 -- no --> C9[Save status with version check;<br/>set or clear completed_at]
+        C9 --> C10[Recalculate project progress,<br/>write activity, notify followers]:::ok
+    end
+
+    subgraph B["B. Upload a file version"]
+        direction TB
+        B0((Start)):::start --> B1[Member chooses a file on a project]
+        B1 --> B2{Allowed to upload on<br/>this project?}
+        B2 -- no --> B2x[403, attempt written to audit log]:::err
+        B2 -- yes --> B3{Size within 100 MB and<br/>extension allowed?}
+        B3 -- no --> B3x[413 or 415]:::err
+        B3 -- yes --> B4{Workspace quota still<br/>available? atomic check}
+        B4 -- no --> B4x[413 Storage limit reached]:::err
+        B4 -- yes --> B5[Read the first bytes and<br/>detect the type by content]
+        B5 --> B6{Content matches<br/>an allowed type?}
+        B6 -- no --> B6x[415; any stored bytes removed]:::err
+        B6 -- yes --> B6a[Stream bytes to object storage]
+        B6a --> B7[Create file version, scan status Pending]
+        B7 --> B8{Virus scan result}
+        B8 -- Clean --> B9[Version available; preview and<br/>10-minute signed download link]:::ok
+        B8 -- Infected --> B8x[422 A virus was found;<br/>version deleted, uploader notified]:::err
+        B8 -- scanner unreachable --> B8r[Stays Scanning; retried every minute]
+        B8r --> B8
+    end
+
+    subgraph A["A. Invite and onboard a user"]
+        direction TB
+        A0((Start)):::start --> A1[Admin enters email, name and role]
+        A1 --> A2{Email already used by<br/>a user or contact?}
+        A2 -- yes --> A2x[409 User already exists]:::err
+        A2 -- no --> A3[Create user with status Invited<br/>and a single-use link valid 7 days]
+        A3 --> A4[Queue invitation email in the outbox]
+        A4 --> A5[Invitee opens the link]
+        A5 --> A6{Link valid, unused<br/>and not revoked?}
+        A6 -- no --> A6x[410 Invitation expired, ask your admin to resend]:::err
+        A6 -- yes --> A7[Invitee sets a password]
+        A7 --> A8{Meets policy?<br/>10+ chars, letter and number,<br/>not email, not a common password}
+        A8 -- no --> A8x[Inline validation error]:::err
+        A8x --> A7
+        A8 -- yes --> A9[Status Active, link marked used,<br/>session created, activity logged]:::ok
+    end

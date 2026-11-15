@@ -1,0 +1,171 @@
+%%{init: {'theme':'base','themeVariables':{'clusterBkg':'#FAFBFD','clusterBorder':'#B8C4D2','lineColor':'#5B6B7C','fontFamily':'Arial','primaryColor':'#E8F0FA','primaryBorderColor':'#2F5D8A','primaryTextColor':'#1B2A3A'}}}%%
+%% CPMP — Entity Relationship Diagram (core entities used by v0.4.0-mvp)
+%% Source: server/prisma/schema.prisma (47 models). Every table also carries workspace_id, created_at,
+%% created_by, updated_at, updated_by; editable tables carry version (optimistic locking).
+%% Omitted here for readability: Workspace (parent of every table), auth tables (Session, AuthToken,
+%% LoginThrottle), template tables, and the planned finance/time/approval tables (schema only, no API yet).
+%% These are listed in the System Analysis document, section 4.
+erDiagram
+    CLIENT ||--o{ CLIENT_CONTACT : "has"
+    CLIENT ||--o{ PROJECT : "owns"
+    USER ||--o{ PROJECT : "is PM of"
+    PROJECT ||--o{ PROJECT_MEMBER : "has"
+    USER |o--o{ PROJECT_MEMBER : "joins as user"
+    CLIENT_CONTACT |o--o{ PROJECT_MEMBER : "joins as contact"
+    PROJECT ||--o{ MILESTONE : "has"
+    PROJECT ||--o{ TASK : "has"
+    MILESTONE |o--o{ TASK : "groups"
+    TASK |o--o{ TASK : "parent of (max depth 2)"
+    TASK ||--o{ TASK_ASSIGNEE : "assigned via"
+    USER ||--o{ TASK_ASSIGNEE : "assigned"
+    TASK ||--o{ TASK_DEPENDENCY : "predecessor"
+    TASK ||--o{ TASK_DEPENDENCY : "successor"
+    TASK ||--o{ TASK_CHECKLIST_ITEM : "has"
+    PROJECT ||--o{ FILE_FOLDER : "has"
+    PROJECT ||--o{ FILE : "stores"
+    FILE_FOLDER |o--o{ FILE : "contains"
+    FILE ||--|{ FILE_VERSION : "versioned as"
+    PROJECT ||--o{ COMMENT : "has"
+    COMMENT |o--o{ COMMENT : "reply to"
+    COMMENT ||--o{ MENTION : "mentions"
+    COMMENT ||--o{ COMMENT_ATTACHMENT : "attaches"
+    FILE ||--o{ COMMENT_ATTACHMENT : "attached as"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o{ FOLLOWER : "follows items"
+
+    CLIENT {
+        uuid id PK
+        string name "unique per workspace, case-insensitive"
+        string code_prefix "3 letters, unique, locked after first project"
+        enum status "Lead, Active, Inactive, Archived"
+        string currency "ISO 4217"
+        string internal_notes "internal roles only"
+        datetime archived_at
+    }
+    CLIENT_CONTACT {
+        uuid id PK
+        uuid client_id FK
+        string email "unique across users and contacts"
+        boolean portal_access
+        boolean is_primary "max one per client"
+        boolean commercial_authority "D-16"
+        enum status "NotInvited, Invited, Active"
+    }
+    USER {
+        uuid id PK
+        string email "unique, lower-case"
+        enum role "Owner, Admin, PM, TeamMember, Finance"
+        enum status "Invited, Active, Deactivated"
+        bigint hourly_cost_rate "minor units"
+        int capacity_minutes_per_week
+    }
+    PROJECT {
+        uuid id PK
+        uuid client_id FK
+        uuid pm_user_id FK
+        string code "CLI-NNN, unique"
+        enum status "NotStarted, InProgress, OnHold, Completed, Cancelled"
+        enum billing_type "Fixed, Hourly, Retainer, NonBillable"
+        date start_date
+        date due_date "on or after start_date"
+        int progress_pct "0-100, calculated"
+        datetime archived_at
+        datetime deleted_at "soft delete, 30 days"
+    }
+    PROJECT_MEMBER {
+        uuid id PK
+        uuid project_id FK
+        uuid user_id FK "either user or contact"
+        uuid contact_id FK
+        enum project_role "PM, Member"
+        enum portal_level "View, Comment, Approve"
+    }
+    MILESTONE {
+        uuid id PK
+        uuid project_id FK
+        string title
+        date due_date
+        enum status "Upcoming, InProgress, Completed"
+        bigint amount "Fixed projects only"
+        enum visibility "Internal, Client"
+    }
+    TASK {
+        uuid id PK
+        uuid project_id FK
+        uuid milestone_id FK
+        uuid parent_task_id FK
+        string title "1-255 chars"
+        enum status "ToDo, InProgress, InReview, Done, Blocked, Cancelled"
+        enum priority "Low, Normal, High, Urgent"
+        int estimate_minutes "quarter-hour steps"
+        enum visibility "Internal, Client"
+        string_array labels
+        datetime completed_at
+    }
+    TASK_ASSIGNEE {
+        uuid task_id FK
+        uuid user_id FK
+    }
+    TASK_DEPENDENCY {
+        uuid predecessor_id FK
+        uuid successor_id FK
+        enum type "FinishToStart"
+    }
+    TASK_CHECKLIST_ITEM {
+        uuid id PK
+        uuid task_id FK
+        string text
+        boolean is_done
+    }
+    FILE_FOLDER {
+        uuid id PK
+        uuid project_id FK
+        string name "unique per project"
+    }
+    FILE {
+        uuid id PK
+        uuid project_id FK
+        uuid folder_id FK
+        uuid task_id FK
+        string name
+        enum visibility "Internal, Client"
+    }
+    FILE_VERSION {
+        uuid id PK
+        uuid file_id FK
+        int version_no "unique per file"
+        string mime_type
+        bigint size_bytes
+        enum scan_status "Pending, Clean, Infected, Failed"
+        string storage_key
+    }
+    COMMENT {
+        uuid id PK
+        uuid project_id FK
+        enum entity_type "Project, Task, File, Approval"
+        uuid entity_id
+        uuid parent_comment_id FK
+        string body "sanitised rich text"
+        enum visibility "Internal, Client"
+        datetime edited_at
+    }
+    MENTION {
+        uuid comment_id FK
+        uuid user_id FK
+    }
+    COMMENT_ATTACHMENT {
+        uuid comment_id FK
+        uuid file_id FK
+    }
+    NOTIFICATION {
+        uuid id PK
+        uuid user_id FK
+        string type
+        enum channel "InApp, Email"
+        datetime read_at
+    }
+    FOLLOWER {
+        string entity_type
+        uuid entity_id
+        uuid user_id FK
+    }
