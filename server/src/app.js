@@ -11,6 +11,7 @@ import { errorHandler, notFoundHandler } from './lib/errors.js';
 import { bigIntReplacer } from './lib/json.js';
 import { logger } from './lib/logger.js';
 import { requestId } from './lib/requestId.js';
+import { portalOnlyForContacts } from './auth/authorize.js';
 import { createAuthRouter } from './modules/auth/routes.js';
 import { healthRouter } from './modules/health/routes.js';
 import { usersRouter } from './modules/users/routes.js';
@@ -19,7 +20,9 @@ import { milestonesRouter, projectsRouter } from './modules/projects/routes.js';
 import { workspaceRouter } from './modules/workspace/routes.js';
 import { meRouter, projectTasksRouter, tasksRouter } from './modules/tasks/routes.js';
 import { templatesRouter } from './modules/templates/routes.js';
+import { approvalsRouter } from './modules/approvals/routes.js';
 import { auditRouter } from './modules/audit/routes.js';
+import { portalRouter } from './modules/portal/routes.js';
 import { commentsRouter } from './modules/comments/routes.js';
 import { filesRouter, projectFilesRouter } from './modules/files/routes.js';
 import { avatarRouter, avatarsRouter, dashboardRouter, searchRouter, storageRouter } from './modules/misc/routes.js';
@@ -75,6 +78,7 @@ export function createApp(options = {}) {
   api.use(csrfProtection); // BR-AUTH-03: every POST/PUT/PATCH/DELETE
   api.use(authenticate); // sets req.principal on every request
   api.use(apiRateLimiter(options.apiRateLimitPerMinute ?? config.auth.apiRateLimitPerMinute));
+  api.use(portalOnlyForContacts); // D-40: contacts reach only /auth and /portal
 
   api.use(healthRouter);
   api.use(
@@ -105,6 +109,9 @@ export function createApp(options = {}) {
   api.use('/search', searchRouter);
   api.use('/storage', storageRouter);
   api.use('/avatars', avatarsRouter);
+  // Phase 5
+  api.use('/approvals', approvalsRouter);
+  api.use('/portal', portalRouter);
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

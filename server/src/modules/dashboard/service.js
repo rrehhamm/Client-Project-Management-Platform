@@ -7,6 +7,7 @@ import { workspaceWeek } from '../../lib/dates.js';
 import { db } from '../../lib/db.js';
 import { projectInclude, toProjectDto } from '../projects/common.js';
 import { projectListWhere } from '../projects/service.js';
+import { approvalListWhere } from '../approvals/service.js';
 import { myTasks, workTaskWhere } from '../tasks/service.js';
 
 const CLOSED = [PROJECT_STATUS.COMPLETED, PROJECT_STATUS.CANCELLED];
@@ -27,6 +28,13 @@ export async function dashboard(viewer) {
     link: `/work?${qs(params)}`,
   });
 
+  // D-33: approval cards, with the same filter as the approvals list they open
+  const approvalCard = async (key, params) => ({
+    key,
+    count: await db.approvalRequest.count({ where: approvalListWhere(viewer, { status: 'Pending', mine: params.mine === 'true' }) }),
+    link: `/approvals?${qs({ status: 'Pending', ...params })}`,
+  });
+
   const out = { view: null, week: { start: week.weekStart, end: week.weekEnd, today: week.today }, cards: [] };
 
   if ([ROLES.OWNER, ROLES.ADMIN, ROLES.FINANCE].includes(viewer.role)) {
@@ -36,6 +44,7 @@ export async function dashboard(viewer) {
       projectCard('active_projects', { active: 'true' }), // D-36: same definition as the client list column
       projectCard('overdue_projects', { overdue: 'true' }),
       taskCard('tasks_due_this_week', { due: 'this_week' }),
+      approvalCard('awaiting_client_approval', {}),
     ]);
     return out;
   }
@@ -47,6 +56,7 @@ export async function dashboard(viewer) {
       projectCard('my_overdue_projects', { pm_user_id: viewer.id, overdue: 'true' }),
       taskCard('tasks_awaiting_review', { mine: 'true', status: 'InReview' }),
       taskCard('inactive_assignees', { mine: 'true', inactive_assignee: 'true' }),
+      approvalCard('approvals_pending', { mine: 'true' }),
     ]);
     out.my_projects = await projectList(viewer, { pm_user_id: viewer.id, sort: 'due_date', order: 'asc' }, week.today);
     return out;

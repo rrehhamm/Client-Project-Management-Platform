@@ -232,6 +232,12 @@ export const RULES = {
 
   // Approvals
   'approval.request': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember }, // D-14
+  'approval.read': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember, [FINANCE]: true, [CONTACT]: contactSeesRecord },
+  'approval.cancel': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: and(isMember, isOwn) }, // FR-APP-06: requester or PM
+  'approval.pin': { ...OWNER_ADMIN, [PM]: isMember, [TEAM_MEMBER]: isMember, [CONTACT]: and(contactOnProject, portalLevelAtLeast('Approve'), (_p, c) => c.isApprover === true) }, // FR-APP-02
+  // Contacts (FR-CON-03…05, NFR-PRIV-02)
+  'contact.portalAccess': { ...OWNER_ADMIN, [PM]: true }, // invite, revoke, restore
+  'contact.privacy': { ...OWNER_ADMIN }, // export, anonymise
   'approval.decide': {
     [CONTACT]: and(contactOnProject, portalLevelAtLeast('Approve'), (_p, c) => c.isApprover === true),
   }, // BR-APP-02: internal users never decide

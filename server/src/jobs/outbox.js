@@ -15,7 +15,7 @@ export async function sendPendingEmails({ limit = 50 } = {}) {
     include: {
       user: { select: { email: true, full_name: true, status: true } },
       contact: { select: { email: true, full_name: true } },
-      workspace: { select: { name: true } },
+      workspace: { select: { name: true, brand_color: true } },
     },
   });
   let sent = 0;
@@ -33,6 +33,7 @@ export async function sendPendingEmails({ limit = 50 } = {}) {
         to: person.email,
         fullName: person.full_name,
         workspaceName: n.workspace.name,
+        brandColor: n.contact_id ? n.workspace.brand_color : undefined,
         subject: p.subject ?? p.title ?? 'Notification',
         paragraphs: [p.text ?? p.title].filter(Boolean),
         link: p.link ?? null,

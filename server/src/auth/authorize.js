@@ -5,7 +5,7 @@ import { writeAudit } from '../lib/audit.js';
 import { forbidden, notFound, unauthenticated, validationError } from '../lib/errors.js';
 import { can } from './can.js';
 
-async function recordDenial(req, action, extra = {}) {
+export async function recordDenial(req, action, extra = {}) {
   // E2E-05: denied attempts are recorded. A logging failure must not change the response.
   try {
     await writeAudit({
@@ -85,4 +85,15 @@ export function authorizeFields(fieldActions) {
     }
     next();
   };
+}
+
+/**
+ * D-40: Client Contacts may use only the sign-in routes and the portal API. Any other
+ * endpoint answers 404 to them (as if it did not exist) and the attempt is recorded.
+ */
+const CONTACT_ALLOWED = [/^\/auth(\/|$)/, /^\/portal(\/|$)/, /^\/health(\/|$)/];
+export async function portalOnlyForContacts(req, _res, next) {
+  if (req.principal?.kind !== 'contact' || CONTACT_ALLOWED.some((re) => re.test(req.path))) return next();
+  await recordDenial(req, 'portal.only', { reason: 'internal_endpoint' });
+  throw notFound();
 }
