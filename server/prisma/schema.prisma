@@ -294,6 +294,7 @@ model Workspace {
   project_templates    ProjectTemplate[]
   file_folders         FileFolder[]
   comment_attachments  CommentAttachment[]
+  approval_pins        ApprovalPin[]
 
   @@map("workspaces")
 }
@@ -341,6 +342,7 @@ model User {
   approved_timesheets Timesheet[]         @relation("TimesheetApprover")
   contract_signatures ContractSignature[]
   notifications       Notification[]
+  approval_pins       ApprovalPin[]
   sessions            Session[]
   auth_tokens         AuthToken[]
 
@@ -418,6 +420,10 @@ model ClientContact {
   /// Personal display timezone; null = workspace timezone (FR-AUTH-13)
   timezone             String?       @db.VarChar(64)
   last_login_at        DateTime?     @db.Timestamptz(3)
+  /// FR-NOT-03 for contacts: only the events they changed (D-35)
+  notification_prefs   Json?
+  /// NFR-PRIV-02: set when personal data was replaced; the record stays for history
+  anonymised_at        DateTime?     @db.Timestamptz(3)
   created_at           DateTime      @default(now()) @db.Timestamptz(3)
   created_by           String?       @db.Uuid
   updated_at           DateTime      @updatedAt @db.Timestamptz(3)
@@ -427,6 +433,7 @@ model ClientContact {
   workspace           Workspace           @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
   client              Client              @relation(fields: [client_id], references: [id], onDelete: Restrict)
   project_memberships ProjectMember[]
+  approval_pins       ApprovalPin[]
   requested_tasks     Task[]
   comments            Comment[]
   mentions            Mention[]
@@ -832,31 +839,37 @@ model FileVersion {
 /// One approval round on a file version or a task (FR-APP-01). Exactly one of
 /// file_version_id / task_id is set (CHECK in migration).
 model ApprovalRequest {
-  id              String         @id @default(uuid(7)) @db.Uuid
-  workspace_id    String         @db.Uuid
-  project_id      String         @db.Uuid
-  file_version_id String?        @db.Uuid
-  task_id         String?        @db.Uuid
-  requested_by    String         @db.Uuid
-  rule            ApprovalRule   @default(Any)
-  message         String?
-  due_date        DateTime?      @db.Date
-  status          ApprovalStatus @default(Pending)
+  id                 String         @id @default(uuid(7)) @db.Uuid
+  workspace_id       String         @db.Uuid
+  project_id         String         @db.Uuid
+  file_version_id    String?        @db.Uuid
+  task_id            String?        @db.Uuid
+  requested_by       String         @db.Uuid
+  rule               ApprovalRule   @default(Any)
+  message            String?
+  due_date           DateTime?      @db.Date
+  status             ApprovalStatus @default(Pending)
   /// Contact whose decision closed the round
-  decision_by     String?        @db.Uuid
-  decision_at     DateTime?      @db.Timestamptz(3)
-  decision_note   String?
-  created_at      DateTime       @default(now()) @db.Timestamptz(3)
-  created_by      String?        @db.Uuid
-  updated_at      DateTime       @updatedAt @db.Timestamptz(3)
-  updated_by      String?        @db.Uuid
-  version         Int            @default(1)
+  decision_by        String?        @db.Uuid
+  decision_at        DateTime?      @db.Timestamptz(3)
+  decision_note      String?
+  /// FR-APP-07: reminders already sent for this request
+  reminded_before_at DateTime?      @db.Timestamptz(3)
+  reminded_due_at    DateTime?      @db.Timestamptz(3)
+  /// FR-APP-06: who cancelled it, and when
+  cancelled_at       DateTime?      @db.Timestamptz(3)
+  created_at         DateTime       @default(now()) @db.Timestamptz(3)
+  created_by         String?        @db.Uuid
+  updated_at         DateTime       @updatedAt @db.Timestamptz(3)
+  updated_by         String?        @db.Uuid
+  version            Int            @default(1)
 
   workspace    Workspace          @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
   project      Project            @relation(fields: [project_id], references: [id], onDelete: Restrict)
   file_version FileVersion?       @relation(fields: [file_version_id], references: [id], onDelete: Restrict)
   task         Task?              @relation(fields: [task_id], references: [id], onDelete: Restrict)
   requester    User               @relation(fields: [requested_by], references: [id], onDelete: Restrict)
+  pins         ApprovalPin[]
   approvers    ApprovalApprover[]
 
   @@index([project_id, status])
@@ -1540,4 +1553,31 @@ model CommentAttachment {
   @@unique([comment_id, file_id])
   @@index([file_id])
   @@map("comment_attachments")
+}
+
+/// FR-APP-02 proofing: a numbered pin on an image or a PDF page. x and y are 0–1
+/// fractions of the page, so pins stay in place at any zoom (D-41).
+model ApprovalPin {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  workspace_id        String   @db.Uuid
+  approval_request_id String   @db.Uuid
+  number              Int
+  page                Int      @default(1)
+  x                   Float
+  y                   Float
+  body                String
+  author_user_id      String?  @db.Uuid
+  author_contact_id   String?  @db.Uuid
+  created_at          DateTime @default(now()) @db.Timestamptz(3)
+  created_by          String?  @db.Uuid
+  updated_at          DateTime @updatedAt @db.Timestamptz(3)
+  updated_by          String?  @db.Uuid
+
+  workspace        Workspace       @relation(fields: [workspace_id], references: [id], onDelete: Restrict)
+  approval_request ApprovalRequest @relation(fields: [approval_request_id], references: [id], onDelete: Cascade)
+  author_user      User?           @relation(fields: [author_user_id], references: [id], onDelete: Restrict)
+  author_contact   ClientContact?  @relation(fields: [author_contact_id], references: [id], onDelete: Restrict)
+
+  @@unique([approval_request_id, number])
+  @@map("approval_pins")
 }

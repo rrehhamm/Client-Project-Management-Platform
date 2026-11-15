@@ -25,6 +25,8 @@ export const commentCreateSchema = z.object({
   body: z.string().min(1).max(100_000),
   visibility: visibilitySchema.optional(),
   mention_user_ids: z.array(uuidSchema).max(50).optional(),
+  /** FR-COM-03: contacts can be mentioned only in Client-visible comments */
+  mention_contact_ids: z.array(uuidSchema).max(20).optional(),
   attachment_file_ids: z.array(uuidSchema).max(COMMENT_MAX_ATTACHMENTS).optional(),
   /** FR-COM-06: reply to a message-board post (project comments only) */
   parent_id: uuidSchema.optional(),
@@ -48,6 +50,8 @@ export const NOTIFICATION_EVENTS = Object.freeze([
   'followed_task_status',
   'task_due_tomorrow',
   'project_status',
+  'approval_decided', // Phase 5: a client decided on an approval you requested or manage
+  'client_request', // Phase 5: a client sent a request on your project
 ]);
 /** email = in-app and email; in_app = in-app only; off = nothing */
 export const NOTIFICATION_CHANNELS = Object.freeze(['email', 'in_app', 'off']);

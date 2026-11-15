@@ -11,3 +11,4 @@ export * from './schemas/clients.js';
 export * from './schemas/projects.js';
 export * from './schemas/tasks.js';
 export * from './schemas/comms.js';
+export * from './schemas/portal.js';
