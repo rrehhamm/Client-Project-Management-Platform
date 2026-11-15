@@ -125,12 +125,13 @@ describe('order, visibility, delete', () => {
   it('contacts see only Client-visible milestones (FR-PORT-02, BR-CLI-02)', async () => {
     const m = (await create(as.PM, projectA.id, { title: 'Shown to client', due_date: '2026-11-20', visibility: 'Client' })).body.milestone;
     const hidden = (await create(as.PM, projectA.id, { title: 'Internal only', due_date: '2026-11-21' })).body.milestone;
-    const titles = (await as.Contact.get(`/api/v1/projects/${projectA.id}/milestones`)).body.data.map((x) => x.title);
+    expect((await as.Contact.get(`/api/v1/projects/${projectA.id}/milestones`)).status).toBe(404); // D-40
+    const titles = (await as.Contact.get(`/api/v1/portal/projects/${projectA.id}`)).body.milestones.map((x) => x.title);
     expect(titles).toContain('Shown to client');
     expect(titles).not.toContain('Internal only');
     // Switching back to Internal hides it at once
     await as.PM.patch(`/api/v1/milestones/${m.id}`, { visibility: 'Internal', version: m.version });
-    expect((await as.Contact.get(`/api/v1/projects/${projectA.id}/milestones`)).body.data.map((x) => x.id)).not.toContain(m.id);
+    expect((await as.Contact.get(`/api/v1/portal/projects/${projectA.id}`)).body.milestones.map((x) => x.id)).not.toContain(m.id); // BR-CLI-02
     // A contact editing a milestone they cannot see gets 404
     expect((await as.Contact.patch(`/api/v1/milestones/${hidden.id}`, { title: 'x', version: hidden.version })).status).toBe(404);
   });

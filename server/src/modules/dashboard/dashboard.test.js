@@ -34,7 +34,7 @@ beforeAll(async () => {
 /** Follow a card's link to its list and compare totals (TC-DASH-001). */
 async function listTotal(c, link) {
   const [path, query] = link.split('?');
-  const api = path === '/work' ? '/api/v1/tasks' : '/api/v1/projects';
+  const api = path === '/work' ? '/api/v1/tasks' : path === '/approvals' ? '/api/v1/approvals' : '/api/v1/projects';
   return (await c.get(`${api}?${query}`)).body.total;
 }
 
@@ -50,7 +50,7 @@ describe('dashboards (FR-DASH-01/02/03, BR-DASH-01)', () => {
   it('Owner/Admin: active projects, overdue projects, tasks due this week (workspace week, BR-DASH-02)', async () => {
     const d = (await as.Admin.get('/api/v1/dashboard')).body;
     expect(d.view).toBe('workspace');
-    expect(Object.fromEntries(d.cards.map((c) => [c.key, c.count]))).toEqual({ active_projects: 2, overdue_projects: 1, tasks_due_this_week: 2 });
+    expect(Object.fromEntries(d.cards.map((c) => [c.key, c.count]))).toEqual({ active_projects: 2, overdue_projects: 1, tasks_due_this_week: 2, awaiting_client_approval: 0 });
     expect(d.week).toEqual({ start: week.weekStart, end: week.weekEnd, today: week.today });
     expect(d.cards.find((c) => c.key === 'overdue_projects').link).toBe('/projects?overdue=true');
   });
@@ -60,7 +60,7 @@ describe('dashboards (FR-DASH-01/02/03, BR-DASH-01)', () => {
     try {
       const d = (await as.PM.get('/api/v1/dashboard')).body;
       expect(d.view).toBe('pm');
-      expect(Object.fromEntries(d.cards.map((c) => [c.key, c.count]))).toEqual({ my_overdue_projects: 1, tasks_awaiting_review: 1, inactive_assignees: 1 });
+      expect(Object.fromEntries(d.cards.map((c) => [c.key, c.count]))).toEqual({ my_overdue_projects: 1, tasks_awaiting_review: 1, inactive_assignees: 1, approvals_pending: 0 });
       expect(d.my_projects.data.map((p) => p.code).sort()).toEqual(['BRI-001', 'NOV-001']);
       expect(d.my_projects.data.find((p) => p.code === 'NOV-001')).toMatchObject({ is_overdue: true, progress_pct: expect.any(Number) });
     } finally {

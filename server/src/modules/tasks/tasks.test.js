@@ -83,8 +83,9 @@ describe('create (FR-TSK-01, FR-TSK-04)', () => {
     expect((await create(as.TeamMember, A.id, { title: 'self', assignee_ids: [W.users.member.id] })).status).toBe(201);
     expect((await create(as.TeamMember, W.projects.B.id, { title: 'x' })).status).toBe(403); // not a member
     expect((await create(as.Finance, A.id, { title: 'x' })).status).toBe(403);
-    expect((await create(as.Contact, A.id, { title: 'x' })).status).toBe(403); // she can see A, so 403 not 404
-    expect((await create(as.Contact, W.projects.B.id, { title: 'x' })).status).toBe(404); // another client's project
+    // D-40: contacts never reach the internal API (their requests go through the portal)
+    expect((await create(as.Contact, A.id, { title: 'x' })).status).toBe(404);
+    expect((await create(as.Contact, W.projects.B.id, { title: 'x' })).status).toBe(404);
     expect((await create(as.Anonymous, A.id, { title: 'x' })).status).toBe(401);
   });
 });
@@ -244,7 +245,7 @@ describe('status (FR-TSK-06, D-23, BR-TSK-02)', () => {
   it('Finance and contacts cannot change status', async () => {
     const t = await newTask({ visibility: 'Client' });
     expect((await setStatus(as.Finance, t, 'InProgress')).status).toBe(403);
-    expect((await setStatus(as.Contact, t, 'InProgress')).status).toBe(403);
+    expect((await setStatus(as.Contact, t, 'InProgress')).status).toBe(404); // D-40
   });
 });
 
@@ -441,13 +442,16 @@ describe('list, read and filters (FR-TSK-09, BR-TSK-03, BR-TSK-06)', () => {
   it('contacts see Client-visible tasks only, with limited fields (BR-TSK-06)', async () => {
     const shown = await newTask({ visibility: 'Client', estimate_minutes: 60, title: 'Shown to client' });
     const hidden = await newTask({ title: 'Internal only' });
-    const list = (await as.Contact.get(`/api/v1/projects/${A.id}/tasks?page_size=100`)).body.data;
+    // D-40: the internal API answers 404; the portal shows Client tasks with portal fields only
+    expect((await as.Contact.get(`/api/v1/projects/${A.id}/tasks`)).status).toBe(404);
+    const list = (await as.Contact.get(`/api/v1/portal/projects/${A.id}/tasks?page_size=100`)).body.data;
     expect(list.map((t) => t.title)).toContain('Shown to client');
     expect(list.map((t) => t.title)).not.toContain('Internal only');
     const item = list.find((t) => t.id === shown.id);
-    expect(Object.keys(item).sort()).toEqual(['assignees', 'due_date', 'id', 'milestone', 'parent_task_id', 'project_id', 'status', 'title']);
-    expect((await as.Contact.get(`/api/v1/tasks/${hidden.id}`)).status).toBe(404);
-    const detail = (await as.Contact.get(`/api/v1/tasks/${shown.id}`)).body;
+    expect(item).not.toHaveProperty('estimate_minutes');
+    expect(item).not.toHaveProperty('is_billable');
+    expect((await as.Contact.get(`/api/v1/portal/tasks/${hidden.id}`)).status).toBe(404);
+    const detail = (await as.Contact.get(`/api/v1/portal/tasks/${shown.id}`)).body;
     expect(detail).not.toHaveProperty('checklist');
     expect(detail).not.toHaveProperty('estimate_minutes');
   });

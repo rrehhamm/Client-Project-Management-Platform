@@ -96,7 +96,7 @@ describe('preferences (FR-NOT-03)', () => {
   it('returns every event with its channel; accepts only known events and channels', async () => {
     const res = await as.Finance.get('/api/v1/me/notification-preferences');
     // D-35: email only for assignment, mentions and due tomorrow; the rest in-app
-    expect(res.body.preferences).toEqual({ task_assigned: 'email', mentioned: 'email', comment_on_followed: 'in_app', followed_task_status: 'in_app', task_due_tomorrow: 'email', project_status: 'in_app' });
+    expect(res.body.preferences).toEqual({ task_assigned: 'email', mentioned: 'email', comment_on_followed: 'in_app', followed_task_status: 'in_app', task_due_tomorrow: 'email', project_status: 'in_app', approval_decided: 'in_app', client_request: 'in_app' });
     expect((await as.Finance.put('/api/v1/me/notification-preferences', { task_assigned: 'loud' })).status).toBe(422);
     expect((await as.Finance.put('/api/v1/me/notification-preferences', { password_reset: 'off' })).status).toBe(422); // security emails cannot be turned off
     const saved = await as.Finance.put('/api/v1/me/notification-preferences', { project_status: 'off' });

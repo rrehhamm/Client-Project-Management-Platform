@@ -148,9 +148,11 @@ describe('read and list (FR-PRJ-08, FR-PRJ-09, BR-CLI-01, BR-PRJ-04)', () => {
 
   it('a non-member Team Member gets 403; a contact gets 404 for another client\'s project', async () => {
     expect((await as.TeamMember.get(`/api/v1/projects/${projectB.id}`)).status).toBe(403);
-    expect((await as.Contact.get(`/api/v1/projects/${projectA.id}`)).status).toBe(200); // own, portal-enabled, member
+    expect((await as.Contact.get(`/api/v1/projects/${projectA.id}`)).status).toBe(404); // D-40: internal API
+    expect((await as.Contact.get(`/api/v1/portal/projects/${projectA.id}`)).status).toBe(200); // own, portal-enabled, member
+    expect((await as.Contact.get(`/api/v1/portal/projects/${projectB.id}`)).status).toBe(404); // TC-PORT-001
     expect((await as.Contact.get(`/api/v1/projects/${projectB.id}`)).status).toBe(404);
-    expect((await as.Contact.get('/api/v1/projects?page_size=100')).body.data.map((p) => p.code)).toEqual(['NOV-001']);
+    expect((await as.Contact.get('/api/v1/portal/projects')).body.data.map((p) => p.code)).toEqual(['NOV-001']);
   });
 
   it('a PM who is not a member cannot read the project', async () => {
@@ -380,10 +382,10 @@ describe('members (FR-PRJ-05, D-14, BR-ROLE-07)', () => {
     expect(res.body.message).toMatch(/new PM/);
   });
 
-  it('contacts see member names only', async () => {
-    const res = await as.Contact.get(`/api/v1/projects/${projectA.id}/members`);
-    expect(res.status).toBe(200);
-    for (const m of res.body.data) expect(Object.keys(m).sort()).toEqual(['full_name', 'id', 'kind']);
+  it('contacts cannot list members; the portal shows only the PM name', async () => {
+    expect((await as.Contact.get(`/api/v1/projects/${projectA.id}/members`)).status).toBe(404); // D-40
+    const p = (await as.Contact.get(`/api/v1/portal/projects/${projectA.id}`)).body;
+    expect(p.pm).toEqual({ full_name: 'Lina' });
   });
 });
 

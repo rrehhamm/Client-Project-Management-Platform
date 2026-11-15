@@ -30,7 +30,10 @@ const current = () => db.workspace.findUniqueOrThrow({ where: { id: W.workspace.
 
 describe('GET /workspace (D-17)', () => {
   it('every signed-in principal reads the public fields; only Owner/Admin get admin fields', async () => {
-    for (const role of ['PM', 'TeamMember', 'Finance', 'Contact']) {
+    // D-40: contacts get the branding from the portal instead; /workspace is internal
+    expect((await as.Contact.get('/api/v1/workspace')).status).toBe(404);
+    expect((await as.Contact.get('/api/v1/portal/branding')).body.workspace).toMatchObject({ name: expect.any(String) });
+    for (const role of ['PM', 'TeamMember', 'Finance']) {
       const res = await as[role].get('/api/v1/workspace');
       expect(res.status, role).toBe(200);
       expect(Object.keys(res.body).sort(), role).toEqual(PUBLIC_FIELDS);
@@ -92,7 +95,7 @@ describe('logo (FR-WS-01, D-22)', () => {
 
     const svg = await upload(as.Admin, SVG, 'image/svg+xml');
     expect(svg.status).toBe(200);
-    expect((await as.Contact.get('/api/v1/workspace')).body.logo_url).toMatch(/\.svg/);
+    expect((await as.Contact.get('/api/v1/portal/branding')).body.workspace.logo_url).toMatch(/\.svg/);
   });
 
   it('refuses SVGs with scripts, event handlers or external references (415)', async () => {

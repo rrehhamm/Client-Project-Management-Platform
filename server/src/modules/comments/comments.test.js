@@ -71,13 +71,14 @@ describe('post and read (FR-COM-01/02)', () => {
     const internal = await post(as.PM, onTask(clientTask, { body: '<p>Internal note</p>' }));
     expect(shared.status).toBe(201);
     expect(internal.status).toBe(201);
-    const seen = await as.Contact.get(`/api/v1/comments?entity_type=Task&entity_id=${clientTask.id}`);
+    expect((await as.Contact.get(`/api/v1/comments?entity_type=Task&entity_id=${clientTask.id}`)).status).toBe(404); // D-40
+    const seen = await as.Contact.get(`/api/v1/portal/comments?entity_type=Task&entity_id=${clientTask.id}`);
     expect(seen.status).toBe(200);
     expect(seen.body.data.map((c) => c.id)).toEqual([shared.body.id]);
     // An Internal task's comments: 404 for the contact
-    expect((await as.Contact.get(`/api/v1/comments?entity_type=Task&entity_id=${task.id}`)).status).toBe(404);
+    expect((await as.Contact.get(`/api/v1/portal/comments?entity_type=Task&entity_id=${task.id}`)).status).toBe(404);
     // Contacts' own comments are always Client
-    const mine = await post(as.Contact, onTask(clientTask, { visibility: 'Internal', body: '<p>From the client</p>' }));
+    const mine = await as.Contact.post('/api/v1/portal/comments', { entity_type: 'Task', entity_id: clientTask.id, body: '<p>From the client</p>' });
     expect(mine.status).toBe(201);
     expect(mine.body.visibility).toBe('Client');
   });
@@ -134,7 +135,9 @@ describe('mentions and notifications (FR-COM-03, FR-NOT-02/05, BR-COM-02, BR-NOT
     expect(await notes({ contact_id: W.contacts.maya.id, entity_id: clientTask.id })).toHaveLength(0);
     await post(as.PM, onTask(clientTask, { visibility: 'Client', body: '<p>Shipped</p>' }));
     const got = await notes({ contact_id: W.contacts.maya.id, entity_id: clientTask.id });
-    expect(got.map((n) => n.channel).sort()).toEqual(['Email', 'InApp']);
+    // Contacts' default for comments on followed items is in-app only (D-35); the link opens the portal
+    expect(got.map((n) => n.channel)).toEqual(['InApp']);
+    expect(got[0].payload.link.startsWith('/portal/projects/')).toBe(true);
     expect(JSON.stringify(got)).not.toMatch(/margin is thin/);
   });
 
@@ -194,7 +197,7 @@ describe('message board (FR-COM-06, D-34 d)', () => {
     // The post's author follows the thread and hears about the reply
     expect(await notes({ user_id: W.users.pm.id, type: 'comment_on_followed', entity_id: A.id })).not.toHaveLength(0);
     // Maya sees the Client post, not the Internal one
-    const maya = await as.Contact.get(`/api/v1/comments?entity_type=Project&entity_id=${A.id}`);
+    const maya = await as.Contact.get(`/api/v1/portal/comments?entity_type=Project&entity_id=${A.id}`);
     expect(maya.body.data.map((c) => c.id)).toContain(p1.id);
     expect(maya.body.data.map((c) => c.id)).not.toContain(p2.id);
   });
