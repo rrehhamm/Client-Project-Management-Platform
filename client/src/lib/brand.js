@@ -5,16 +5,16 @@
 // Light mode darkens the colour, dark mode lightens it, in 2% steps, keeping its hue.
 // Status colours (success, warning, danger, info) are fixed and never derived from it.
 
-export const DEFAULT_BRAND = '#2563EB';
+export const DEFAULT_BRAND = '#3E5BA3';
 
 // Surfaces the brand colour sits on. Must match src/styles/tokens.css.
 export const SURFACES = {
-  light: { background: '#F8FAFC', card: '#FFFFFF', foreground: '#0F172A' },
-  dark: { background: '#0F172A', card: '#172033', foreground: '#F1F5F9' },
+  light: { background: '#F6F8F5', card: '#FFFFFF', foreground: '#0C2D45' },
+  dark: { background: '#0B2436', card: '#10304A', foreground: '#E9F1EC' },
 };
 
 // Dark label for light buttons, in both modes.
-const INK = '#0F172A';
+const INK = '#0C2D45';
 
 const HEX = /^#[0-9a-f]{6}$/i;
 

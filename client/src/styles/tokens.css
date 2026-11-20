@@ -1,11 +1,11 @@
 /*
- * D-45 design tokens: "Clean Professional SaaS". The only place colours, radii, shadows,
+ * D-45 design tokens: "Clean Professional SaaS", calm palette (Dusk Blue, Deep Space Blue, Moss Green, Frosted Mint, Lemon Chiffon). The only place colours, radii, shadows,
  * fonts and motion timings are defined. Components use the Tailwind names mapped in
  * @theme below (bg-card, text-brand-text, shadow-card...), never raw hex values.
  *
  * Modes: <html class="light"> or <html class="dark">, set by src/lib/appearance.js from the
  * user's setting (System / Light / Dark). Brand tokens (--primary, --primary-foreground,
- * --brand-text, --brand-soft, --ring) are the defaults for #2563EB; src/lib/brand.js
+ * --brand-text, --brand-soft, --ring) are the defaults for #3E5BA3 (Dusk Blue); src/lib/brand.js
  * overrides them per workspace with contrast-checked values. Status colours are fixed.
  * Every text pair here is at least 4.5:1 (WCAG AA); input borders are at least 3:1.
  * See docs/DESIGN.md.
@@ -17,76 +17,81 @@
   color-scheme: light;
 
   /* Surfaces and text */
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f6f8f5;
+  --foreground: #0c2d45;
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #475569;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --accent: #f1f5f9; /* hover surface for ghost and outline controls */
-  --accent-foreground: #0f172a;
+  --card-foreground: #0c2d45;
+  --muted: #edf2ee;
+  --muted-foreground: #4b6274;
+  --secondary: #edf2ee;
+  --secondary-foreground: #0c2d45;
+  --accent: #edf2ee; /* hover surface for ghost and outline controls */
+  --accent-foreground: #0c2d45;
   --sidebar: #ffffff;
-  --border: #e2e8f0;
-  --input: #8492a6;
-  --overlay: rgb(15 23 42 / 0.5);
+  --border: #dce5df;
+  --input: #7a8e9c;
+  --overlay: rgb(12 45 69 / 0.45);
 
-  /* Brand (workspace colour, replaced at runtime by brand.js) */
-  --primary: #2563eb;
+  /* Brand (workspace colour, replaced at runtime by brand.js). Default: Dusk Blue. */
+  --primary: #3e5ba3;
   --primary-foreground: #ffffff;
-  --brand-text: #2461e6;
-  --brand-soft: #e9effd;
-  --ring: #2461e6;
+  --brand-text: #3e5ba3;
+  --brand-soft: #eceff6;
+  --ring: #3e5ba3;
 
-  /* Status (fixed) */
-  --success: #166534;
-  --warning: #92400e;
-  --destructive: #b91c1c;
+  /* Status (fixed). Soft backgrounds: Frosted Mint and Lemon Chiffon from the palette. */
+  --success: #2e6b28;
+  --success-soft: #e6fbda;
+  --warning: #7a5b00;
+  --warning-soft: #fff8d2;
+  --destructive: #a8322d;
+  --destructive-soft: #f8efee;
   --destructive-foreground: #ffffff;
-  --info: #0369a1;
-  --status-soft: 8%;
+  --info: #2f5c8a;
+  --info-soft: #eef2f6;
 
   /* Elevation: two levels only */
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
-  --shadow-overlay:
-    0 16px 40px -12px rgb(15 23 42 / 0.25), 0 4px 12px -4px rgb(15 23 42 / 0.1);
+  --shadow-card: 0 1px 2px rgb(12 45 69 / 0.05), 0 1px 3px rgb(12 45 69 / 0.06);
+  --shadow-overlay: 0 16px 40px -12px rgb(12 45 69 / 0.25), 0 4px 12px -4px rgb(12 45 69 / 0.1);
 }
 
 :root.dark {
   color-scheme: dark;
 
-  --background: #0f172a;
-  --foreground: #f1f5f9;
-  --card: #172033;
-  --card-foreground: #f1f5f9;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --secondary: #1e293b;
-  --secondary-foreground: #f1f5f9;
-  --accent: #1e293b;
-  --accent-foreground: #f1f5f9;
-  --sidebar: #0b1220;
-  --border: #263247;
-  --input: #64748b;
-  --overlay: rgb(2 6 23 / 0.7);
+  --background: #0b2436;
+  --foreground: #e9f1ec;
+  --card: #10304a;
+  --card-foreground: #e9f1ec;
+  --muted: #173b58;
+  --muted-foreground: #a3b6c4;
+  --secondary: #173b58;
+  --secondary-foreground: #e9f1ec;
+  --accent: #173b58;
+  --accent-foreground: #e9f1ec;
+  --sidebar: #081c2b;
+  --border: #21476a;
+  --input: #5f7c93;
+  --overlay: rgb(4 16 26 / 0.7);
 
-  --primary: #2563eb;
+  --primary: #5d75b2;
   --primary-foreground: #ffffff;
-  --brand-text: #789ef3;
-  --brand-soft: #283756;
-  --ring: #789ef3;
+  --brand-text: #a6b4d5;
+  --brand-soft: #2b4863;
+  --ring: #a6b4d5;
 
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --destructive: #f87171;
-  --destructive-foreground: #0f172a;
-  --info: #38bdf8;
-  --status-soft: 15%;
+  /* Moss Green and soft lemon on Deep Space Blue */
+  --success: #84d175;
+  --success-soft: #214850;
+  --warning: #f3e39a;
+  --warning-soft: #324b56;
+  --destructive: #f1a29b;
+  --destructive-soft: #324156;
+  --destructive-foreground: #0c2d45;
+  --info: #9cc3ea;
+  --info-soft: #254662;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
-  --shadow-overlay:
-    0 16px 40px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-overlay: 0 16px 40px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
 }
 
 @theme inline {
@@ -114,26 +119,10 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-info: var(--info);
-  --color-success-soft: color-mix(
-    in srgb,
-    var(--success) var(--status-soft),
-    var(--card)
-  );
-  --color-warning-soft: color-mix(
-    in srgb,
-    var(--warning) var(--status-soft),
-    var(--card)
-  );
-  --color-destructive-soft: color-mix(
-    in srgb,
-    var(--destructive) var(--status-soft),
-    var(--card)
-  );
-  --color-info-soft: color-mix(
-    in srgb,
-    var(--info) var(--status-soft),
-    var(--card)
-  );
+  --color-success-soft: var(--success-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-info-soft: var(--info-soft);
 
   --shadow-card: var(--shadow-card);
   --shadow-overlay: var(--shadow-overlay);

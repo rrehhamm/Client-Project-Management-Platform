@@ -1,6 +1,6 @@
 # Design system
 
-Decision **D-45** in [DECISIONS.md](DECISIONS.md). Direction: **Clean Professional SaaS**. The look is quiet and neutral, one accent colour from the company's brand, dense where people work, generous where they read.
+Decision **D-45** in [DECISIONS.md](DECISIONS.md). Direction: **Clean Professional SaaS** with a calm palette chosen by the Product Owner: Dusk Blue `#3E5BA3`, Deep Space Blue `#0C2D45`, Moss Green `#84D175`, Frosted Mint `#E6FBDA`, Lemon Chiffon `#FFF8D2`. No loud, saturated colours. The look is quiet and neutral, one accent colour from the company's brand, dense where people work, generous where they read.
 
 ## Where things live
 
@@ -25,10 +25,10 @@ Light and dark are classes on `<html>` (`light` / `dark`), set from the user's a
 
 | Group          | Tokens                                                                                                        | Notes                                                                                                                                        |
 | -------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Surfaces       | `background`, `card`, `sidebar`, `muted`, `secondary`, `accent` (hover surface), `border`, `input`, `overlay` | Slate neutrals. Input borders are at least 3:1 against page and card (WCAG 1.4.11).                                                          |
+| Surfaces       | `background`, `card`, `sidebar`, `muted`, `secondary`, `accent` (hover surface), `border`, `input`, `overlay` | Calm green-grey neutrals; text in Deep Space Blue `#0C2D45`. Input borders are at least 3:1 against page and card (WCAG 1.4.11).                                                          |
 | Text           | `foreground`, `muted-foreground`                                                                              | Both are at least 4.5:1 on every surface.                                                                                                    |
-| Brand          | `primary`, `primary-foreground`, `brand-text`, `brand-soft`, `ring`                                           | Derived from the workspace colour (below). Defaults are for `#2563EB`.                                                                       |
-| Status (fixed) | `success`, `warning`, `destructive`, `info`, each with `*-soft`; `destructive-foreground`                     | They never follow the brand colour. Soft backgrounds are an 8% tint in light mode and 15% in dark mode. Text on them stays at 4.5:1 or more. |
+| Brand          | `primary`, `primary-foreground`, `brand-text`, `brand-soft`, `ring`                                           | Derived from the workspace colour (below). Default: Dusk Blue `#3E5BA3`.                                                                       |
+| Status (fixed) | `success`, `warning`, `destructive`, `info`, each with `*-soft`; `destructive-foreground`                     | They never follow the brand colour. Light-mode soft backgrounds are Frosted Mint `#E6FBDA` (success) and Lemon Chiffon `#FFF8D2` (warning); dark mode uses Moss Green `#84D175` on Deep Space Blue. Text on them stays at 4.5:1 or more. |
 
 ### Brand colour and contrast protection
 

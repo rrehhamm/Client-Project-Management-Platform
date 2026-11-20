@@ -147,7 +147,9 @@ const Sub = ({ children }) => <h3 className="text-xs font-semibold uppercase tra
 // ---------------------------------------------------------------- controls
 
 const PRESETS = [
-  ['Default blue', DEFAULT_BRAND],
+  ['Dusk Blue (default)', DEFAULT_BRAND],
+  ['Moss Green', '#84D175'],
+  ['Deep Space Blue', '#0C2D45'],
   ['Violet', '#7C3AED'],
   ['Rose', '#E11D48'],
   ['Teal', '#0D9488'],
@@ -914,7 +916,7 @@ export function Preview() {
         <Section
           id="tokens"
           title="Colour tokens"
-          description="Neutral slate surfaces, one brand accent taken from the workspace colour, and four fixed status colours. Pick another brand colour above to see contrast protection adjust it."
+          description="Calm palette: soft green-grey surfaces, Deep Space Blue text, one brand accent taken from the workspace colour, and four fixed status colours. Pick another brand colour above to see contrast protection adjust it."
         >
           <Tokens vals={vals} />
         </Section>

@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { contrast, mix } from '@/lib/brand';
+import { contrast } from '@/lib/brand';
 
 const css = readFileSync(resolve(import.meta.dirname, 'tokens.css'), 'utf8');
 const [lightBlock, darkBlock] = css.split(':root.dark');
@@ -46,7 +46,7 @@ describe.each(Object.entries(MODES))('%s mode tokens', (mode, tk) => {
   });
 
   it.each(['success', 'warning', 'destructive', 'info'])('%s text reads on page, card and its soft background', (status) => {
-    const soft = mix(tk.card, tk[status], Number.parseInt(tk['status-soft'], 10) / 100);
+    const soft = tk[`${status}-soft`];
     for (const bg of [tk.background, tk.card, soft]) expect(contrast(tk[status], bg)).toBeGreaterThanOrEqual(4.5);
   });
 });

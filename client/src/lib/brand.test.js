@@ -4,12 +4,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { brandCss, brandTokens, contrast, DEFAULT_BRAND, mix, SURFACES } from './brand';
 
-const SAMPLES = ['#2563EB', '#FACC15', '#22C55E', '#000000', '#FFFFFF', '#E11D48', '#7C3AED', '#06B6D4', '#F97316', '#808080'];
+const SAMPLES = ['#3E5BA3', '#2563EB', '#84D175', '#0C2D45', '#FACC15', '#22C55E', '#000000', '#FFFFFF', '#E11D48', '#7C3AED', '#06B6D4', '#F97316', '#808080'];
 
 describe('brand tokens', () => {
   it('keeps the default blue unchanged in light mode', () => {
     expect(brandTokens(DEFAULT_BRAND).light).toMatchObject({
-      primary: '#2563EB',
+      primary: '#3E5BA3',
       primaryForeground: '#FFFFFF',
     });
   });
@@ -35,7 +35,7 @@ describe('brand tokens', () => {
     const { light, dark } = brandTokens('#FACC15');
     expect(contrast(light.brandText, '#FFFFFF')).toBeGreaterThan(contrast('#FACC15', '#FFFFFF'));
     expect(dark.primary).toBe('#FACC15');
-    expect(dark.primaryForeground).toBe('#0F172A');
+    expect(dark.primaryForeground).toBe('#0C2D45');
   });
 
   it('writes CSS for both modes', () => {
