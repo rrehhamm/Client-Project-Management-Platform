@@ -44,7 +44,7 @@ export default function RichComposer({ people = [], onSubmit, onCancel, submitLa
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
       attributes: {
-        class: 'min-h-16 px-3 py-2 text-sm outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-primary [&_a]:underline',
+        class: 'min-h-16 px-3 py-2 text-sm outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-brand-text [&_a]:underline',
         role: 'textbox',
         'aria-multiline': 'true',
         'aria-label': label,

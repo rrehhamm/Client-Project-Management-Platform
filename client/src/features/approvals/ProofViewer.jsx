@@ -32,7 +32,7 @@ function Pin({ pin, active, onSelect }) {
         onSelect(pin.id);
       }}
       aria-label={t('approvals.pinLabel', { n: pin.number, body: pin.body })}
-      className={cn('absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow', active ? 'bg-destructive' : 'bg-primary')}
+      className={cn('absolute flex size-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-xs font-bold shadow-card', active ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground')}
       style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
     >
       {pin.number}

@@ -30,7 +30,7 @@ export function ImageAttachment({ attachment }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t('comments.openImage', { name: attachment.name })}
-        className="block overflow-hidden rounded-md border hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="block overflow-hidden rounded-md border hover:ring-2 hover:ring-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         data-testid={`thumb-${attachment.file_id}`}
       >
         {link.data ? (

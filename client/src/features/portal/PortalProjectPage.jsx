@@ -63,11 +63,11 @@ function TaskDialog({ id, project, onOpen, onClose }) {
               {task.assignees.length ? <span className="text-muted-foreground">· {task.assignees.map((a) => a.full_name).join(', ')}</span> : null}
             </div>
             {task.parent ? (
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => onOpen(task.parent.id)}>
+              <button type="button" className="text-sm text-brand-text hover:underline" onClick={() => onOpen(task.parent.id)}>
                 ↑ {task.parent.title}
               </button>
             ) : null}
-            {task.description ? <div className="text-sm [&_a]:text-primary [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: safeHtml(task.description) }} /> : null}
+            {task.description ? <div className="text-sm [&_a]:text-brand-text [&_a]:underline [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: safeHtml(task.description) }} /> : null}
             {task.subtasks.length ? (
               <section aria-label={t('tasks.panel.subtasks')} className="space-y-1">
                 <h3 className="text-sm font-semibold">{t('tasks.panel.subtasks')}</h3>
@@ -89,7 +89,7 @@ function TaskDialog({ id, project, onOpen, onClose }) {
                 <ul className="text-sm">
                   {task.files.map((f) => (
                     <li key={f.id}>
-                      <Link to={`?tab=files&file=${f.id}`} className="text-primary hover:underline">
+                      <Link to={`?tab=files&file=${f.id}`} className="text-brand-text hover:underline">
                         {f.name}
                       </Link>
                     </li>
@@ -307,7 +307,7 @@ export function PortalProjectPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/portal" className="text-sm text-primary hover:underline">
+      <Link to="/portal" className="text-sm text-brand-text hover:underline">
         ← {t('portal.nav.home')}
       </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">

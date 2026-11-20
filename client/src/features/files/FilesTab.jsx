@@ -208,7 +208,7 @@ export function FilesTab({ project }) {
               setDragging(false);
               start(e.dataTransfer.files);
             }}
-            className={cn('flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center', dragging && 'border-primary bg-primary/5')}
+            className={cn('flex flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 text-center', dragging && 'border-brand-text bg-brand-soft')}
           >
             <Upload aria-hidden="true" className="size-6 text-muted-foreground" />
             <p className="text-sm">{t('files.drop')}</p>

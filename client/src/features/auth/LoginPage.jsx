@@ -55,7 +55,7 @@ export function LoginPage() {
         <Button type="submit" disabled={login.isPending}>
           {login.isPending ? t('auth.login.submitting') : t('auth.login.submit')}
         </Button>
-        <Link to="/forgot-password" className="text-center text-sm text-primary underline-offset-4 hover:underline">
+        <Link to="/forgot-password" className="text-center text-sm text-brand-text underline-offset-4 hover:underline">
           {t('auth.login.forgot')}
         </Link>
       </form>

@@ -67,7 +67,7 @@ export function TaskCalendarView({ projectId, filters, workspace, onOpen }) {
               const items = byDay.get(key) ?? [];
               return (
                 <div key={key} role="gridcell" data-testid={`day-${key}`} className={cn('min-h-24 border-b border-r p-1', !inMonth && 'bg-muted/30 text-muted-foreground')}>
-                  <div className={cn('mb-1 text-right', key === today && 'font-bold text-primary')}>
+                  <div className={cn('mb-1 text-right', key === today && 'font-bold text-brand-text')}>
                     {d.getUTCDate()}
                     {key === today ? <span className="sr-only"> ({t('tasks.calendar.today')})</span> : null}
                   </div>
@@ -77,7 +77,7 @@ export function TaskCalendarView({ projectId, filters, workspace, onOpen }) {
                         <button
                           type="button"
                           onClick={() => onOpen(task.id)}
-                          className={cn('w-full truncate rounded px-1 py-0.5 text-left hover:bg-accent', task.status === 'Done' ? 'line-through opacity-60' : task.is_overdue ? 'bg-destructive/10' : 'bg-primary/10')}
+                          className={cn('w-full truncate rounded px-1 py-0.5 text-left hover:bg-accent', task.status === 'Done' ? 'line-through opacity-60' : task.is_overdue ? 'bg-destructive/10' : 'bg-brand-soft')}
                         >
                           {task.title}
                         </button>

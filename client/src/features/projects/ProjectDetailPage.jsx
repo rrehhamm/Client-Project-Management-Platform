@@ -183,7 +183,7 @@ export function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/projects" className="text-sm text-primary hover:underline">
+      <Link to="/projects" className="text-sm text-brand-text hover:underline">
         ← {t('projects.title')}
       </Link>
       <PageHeader
@@ -192,7 +192,7 @@ export function ProjectDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono">{p.code}</span>
             <span aria-hidden="true">·</span>
-            <Link to={`/clients/${p.client.id}`} className="text-primary hover:underline">
+            <Link to={`/clients/${p.client.id}`} className="text-brand-text hover:underline">
               {p.client.name}
             </Link>
             <span aria-hidden="true">·</span>

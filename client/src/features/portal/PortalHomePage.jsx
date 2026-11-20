@@ -39,7 +39,7 @@ export function PortalHomePage() {
                 <ul className="divide-y">
                   {query.data.awaiting.approvals.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                      <Link to={`/portal/approvals/${a.id}`} className="font-medium text-primary hover:underline">
+                      <Link to={`/portal/approvals/${a.id}`} className="font-medium text-brand-text hover:underline">
                         {t('portal.approve', { name: a.subject.file?.name ?? a.subject.task?.title })}
                       </Link>
                       <span className="text-muted-foreground">{a.project.name}</span>

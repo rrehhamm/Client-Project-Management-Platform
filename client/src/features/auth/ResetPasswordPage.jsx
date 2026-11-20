@@ -24,7 +24,7 @@ export function ResetPasswordPage() {
     return (
       <AuthCard title={t('auth.reset.title')}>
         <Alert variant="destructive">{t('auth.reset.missingToken')}</Alert>
-        <Link to="/forgot-password" className="mt-4 block text-center text-sm text-primary hover:underline">
+        <Link to="/forgot-password" className="mt-4 block text-center text-sm text-brand-text hover:underline">
           {t('auth.reset.requestNew')}
         </Link>
       </AuthCard>

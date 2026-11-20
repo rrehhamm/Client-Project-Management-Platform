@@ -30,7 +30,7 @@ export function ForgotPasswordPage() {
           </Button>
         </form>
       )}
-      <Link to="/login" className="mt-4 block text-center text-sm text-primary underline-offset-4 hover:underline">
+      <Link to="/login" className="mt-4 block text-center text-sm text-brand-text underline-offset-4 hover:underline">
         {t('auth.forgot.backToLogin')}
       </Link>
     </AuthCard>

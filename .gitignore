@@ -21,3 +21,4 @@ client/blob-report/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.shots/

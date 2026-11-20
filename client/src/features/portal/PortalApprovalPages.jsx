@@ -36,7 +36,7 @@ export function PortalApprovalsPage() {
               </Link>
               <span className="text-muted-foreground">{a.project.name}</span>
               <ApprovalStatusBadge status={a.status} />
-              {a.can_decide ? <span className="text-xs font-medium text-primary">{t('portal.yourTurn')}</span> : null}
+              {a.can_decide ? <span className="text-xs font-medium text-brand-text">{t('portal.yourTurn')}</span> : null}
               {a.due_date ? <span className="text-xs text-muted-foreground">{formatDate(a.due_date, me.workspace.date_format)}</span> : null}
             </li>
           ))}
@@ -90,7 +90,7 @@ export function PortalApprovalPage() {
   const amApprover = a.approvers.some((x) => x.is_me);
   return (
     <div className="space-y-6">
-      <Link to="/portal/approvals" className="text-sm text-primary hover:underline">
+      <Link to="/portal/approvals" className="text-sm text-brand-text hover:underline">
         ← {t('portal.nav.approvals')}
       </Link>
       <div>

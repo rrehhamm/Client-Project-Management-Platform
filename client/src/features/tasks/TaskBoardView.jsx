@@ -58,7 +58,7 @@ function Card({ task, dateFormat, onOpen, onMove }) {
 function Column({ status, tasks, dateFormat, onOpen, onMove }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <section ref={setNodeRef} aria-label={t(`taskStatus.${status}`)} data-testid={`column-${status}`} className={cn('flex w-64 shrink-0 flex-col rounded-lg bg-muted/50 p-2', isOver && 'ring-2 ring-primary')}>
+    <section ref={setNodeRef} aria-label={t(`taskStatus.${status}`)} data-testid={`column-${status}`} className={cn('flex w-64 shrink-0 flex-col rounded-lg bg-muted/50 p-2', isOver && 'ring-2 ring-ring')}>
       <h3 className="mb-2 flex items-center justify-between px-1 text-sm font-semibold">
         {t(`taskStatus.${status}`)}
         <span className="text-xs font-normal text-muted-foreground">{tasks.length}</span>

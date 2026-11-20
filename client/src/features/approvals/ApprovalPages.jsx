@@ -45,7 +45,7 @@ export function ApprovalPage() {
   const a = query.data;
   return (
     <div className="space-y-6">
-      <Link to={`/projects/${a.project.id}?tab=${a.subject.type === 'file' ? `files&file=${a.subject.file.id}` : `tasks&task=${a.subject.task.id}`}`} className="text-sm text-primary hover:underline">
+      <Link to={`/projects/${a.project.id}?tab=${a.subject.type === 'file' ? `files&file=${a.subject.file.id}` : `tasks&task=${a.subject.task.id}`}`} className="text-sm text-brand-text hover:underline">
         ← {a.project.code} · {a.project.name}
       </Link>
       <PageHeader

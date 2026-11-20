@@ -28,7 +28,7 @@ function MyProjects({ projects, dateFormat }) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t('dashboard.myProjects')}</CardTitle>
         {projects.total > projects.data.length ? (
-          <Link to={projects.link} className="text-sm text-primary hover:underline">
+          <Link to={projects.link} className="text-sm text-brand-text hover:underline">
             {t('dashboard.allProjects', { count: projects.total })}
           </Link>
         ) : null}

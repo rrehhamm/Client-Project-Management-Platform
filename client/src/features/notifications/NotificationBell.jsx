@@ -47,7 +47,7 @@ export function NotificationBell() {
       <Button variant="ghost" size="icon" aria-label={count ? t('notifications.bell', { count }) : t('notifications.bellNone')} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>
         <Bell aria-hidden="true" />
         {count ? (
-          <span aria-hidden="true" className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">
+          <span aria-hidden="true" className="absolute end-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
             {count > 99 ? '99+' : count}
           </span>
         ) : null}
@@ -73,7 +73,7 @@ export function NotificationBell() {
               <ul className="divide-y">
                 {list.data.data.map((n) => (
                   <li key={n.id}>
-                    <button type="button" onClick={() => go(n)} className={cn('flex w-full gap-2 px-3 py-2 text-left text-sm hover:bg-accent', !n.read && 'bg-primary/5')}>
+                    <button type="button" onClick={() => go(n)} className={cn('flex w-full gap-2 px-3 py-2 text-left text-sm hover:bg-accent', !n.read && 'bg-brand-soft')}>
                       {!n.read ? <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-label={t('notifications.unreadDot')} /> : <span className="size-2 shrink-0" />}
                       <span className="min-w-0">
                         <span className={cn('block', !n.read && 'font-medium')}>{n.title}</span>

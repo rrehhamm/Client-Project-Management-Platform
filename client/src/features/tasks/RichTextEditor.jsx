@@ -28,7 +28,7 @@ export default function RichTextEditor({ value, editable, onSave, pending, label
     extensions: [StarterKit.configure({ heading: false, codeBlock: false, horizontalRule: false, link: false }), Link.configure({ openOnClick: false, protocols: ['http', 'https', 'mailto'] })],
     content: value ?? '',
     editable,
-    editorProps: { attributes: { class: 'prose-sm min-h-24 px-3 py-2 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-primary [&_a]:underline', 'aria-labelledby': labelId, role: 'textbox', 'aria-multiline': 'true' } },
+    editorProps: { attributes: { class: 'prose-sm min-h-24 px-3 py-2 outline-none [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_a]:text-brand-text [&_a]:underline', 'aria-labelledby': labelId, role: 'textbox', 'aria-multiline': 'true' } },
   });
   if (!editor) return null;
 

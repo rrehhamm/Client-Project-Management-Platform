@@ -96,7 +96,7 @@ export function ClientsPage() {
                 {clients.data.data.map((c) => (
                   <tr key={c.id} data-testid={`client-row-${c.name}`} className="hover:bg-muted/30">
                     <td className="px-4 py-3">
-                      <Link to={`/clients/${c.id}`} className="font-medium text-primary hover:underline">
+                      <Link to={`/clients/${c.id}`} className="font-medium text-brand-text hover:underline">
                         {c.name}
                       </Link>
                       {c.code_prefix ? <span className="ml-2 font-mono text-xs text-muted-foreground">{c.code_prefix}</span> : null}

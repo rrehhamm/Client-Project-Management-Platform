@@ -26,7 +26,7 @@ export function ProjectList({ projects, view = 'table', dateFormat, showClient =
             <CardHeader className="px-4">
               <span className="font-mono text-xs text-muted-foreground">{p.code}</span>
               <CardTitle>
-                <Link to={`/projects/${p.id}`} className="text-primary hover:underline">
+                <Link to={`/projects/${p.id}`} className="text-brand-text hover:underline">
                   {p.name}
                 </Link>
               </CardTitle>
@@ -69,7 +69,7 @@ export function ProjectList({ projects, view = 'table', dateFormat, showClient =
                 {onRestore ? (
                   <span className="font-medium">{p.name}</span>
                 ) : (
-                  <Link to={`/projects/${p.id}`} className="font-medium text-primary hover:underline">
+                  <Link to={`/projects/${p.id}`} className="font-medium text-brand-text hover:underline">
                     {p.name}
                   </Link>
                 )}

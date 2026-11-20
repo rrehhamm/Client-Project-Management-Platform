@@ -11,17 +11,17 @@ const DialogClose = DialogPrimitive.Close;
 function DialogContent({ className, children, ...props }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border bg-background p-6 shadow-lg',
+          'fixed left-1/2 top-1/2 z-50 grid max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border bg-card p-6 text-card-foreground shadow-overlay',
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-xs opacity-70 hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none">
+        <DialogPrimitive.Close className="absolute end-4 top-4 cursor-pointer rounded-md p-1 text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
           <XIcon className="size-4" aria-hidden="true" />
           <span className="sr-only">{t('common.close')}</span>
         </DialogPrimitive.Close>
@@ -31,7 +31,7 @@ function DialogContent({ className, children, ...props }) {
 }
 
 function DialogHeader({ className, ...props }) {
-  return <div className={cn('flex flex-col gap-2 text-left', className)} {...props} />;
+  return <div className={cn('flex flex-col gap-2 text-start', className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }) {
@@ -39,7 +39,7 @@ function DialogFooter({ className, ...props }) {
 }
 
 function DialogTitle({ className, ...props }) {
-  return <DialogPrimitive.Title className={cn('text-lg font-semibold leading-none', className)} {...props} />;
+  return <DialogPrimitive.Title className={cn('text-lg font-semibold leading-tight tracking-tight', className)} {...props} />;
 }
 
 function DialogDescription({ className, ...props }) {

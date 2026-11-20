@@ -31,8 +31,8 @@ export function Tabs({ tabs, value, onChange, label }) {
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              '-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-              selected ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+              '-mb-px cursor-pointer whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+              selected ? 'border-brand-text text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
             )}
           >
             {tab.label}

@@ -8,9 +8,11 @@ function Alert({ className, variant = 'default', ...props }) {
       data-slot="alert"
       className={cn(
         'rounded-lg border px-4 py-3 text-sm',
-        variant === 'destructive' && 'border-destructive/40 bg-destructive/10 text-destructive',
-        variant === 'success' && 'border-success/40 bg-success/10 text-success',
-        variant === 'warning' && 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
+        variant === 'default' && 'bg-card text-foreground',
+        variant === 'info' && 'border-info/30 bg-info-soft text-info',
+        variant === 'destructive' && 'border-destructive/30 bg-destructive-soft text-destructive',
+        variant === 'success' && 'border-success/30 bg-success-soft text-success',
+        variant === 'warning' && 'border-warning/30 bg-warning-soft text-warning',
         className,
       )}
       {...props}

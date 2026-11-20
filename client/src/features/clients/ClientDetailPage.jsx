@@ -46,7 +46,7 @@ function Overview({ client }) {
             <Field label={t('clients.form.industry')}>{client.industry}</Field>
             <Field label={t('clients.form.website')}>
               {client.website ? (
-                <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-brand-text hover:underline">
                   {client.website}
                 </a>
               ) : null}
@@ -136,7 +136,7 @@ export function ClientDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/clients" className="text-sm text-primary hover:underline">
+      <Link to="/clients" className="text-sm text-brand-text hover:underline">
         ← {t('clients.title')}
       </Link>
       <PageHeader

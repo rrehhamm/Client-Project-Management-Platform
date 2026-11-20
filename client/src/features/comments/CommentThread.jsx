@@ -25,7 +25,7 @@ const isThumbnailable = (a) => a.scan_status === 'Clean' && THUMBNAIL_TYPES.incl
 const RichComposer = lazy(() => import('./RichComposer'));
 
 export const InternalTag = () => (
-  <Badge variant="warning" className="bg-yellow-100 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-100">
+  <Badge variant="warning">
     {t('comments.internal')}
   </Badge>
 );
@@ -93,7 +93,7 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
           </Suspense>
         ) : (
           // Cleaned on the server and again here (lib/safeHtml.js)
-          <div className="text-sm [&_a]:text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: safeHtml(c.body) }} />
+          <div className="text-sm [&_a]:text-brand-text [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5" dangerouslySetInnerHTML={{ __html: safeHtml(c.body) }} />
         )}
         {c.attachments.length ? (
           <ul className="flex flex-wrap items-end gap-2">
@@ -115,7 +115,7 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
         {!c.deleted && !editing ? (
           <div className="flex gap-3 text-xs">
             {onReply ? (
-              <button type="button" className="text-primary hover:underline" onClick={onReply}>
+              <button type="button" className="text-brand-text hover:underline" onClick={onReply}>
                 {replyCount ? t('comments.showReplies', { count: replyCount }) : t('comments.reply')}
               </button>
             ) : null}

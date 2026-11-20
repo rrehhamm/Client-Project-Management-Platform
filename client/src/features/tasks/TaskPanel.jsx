@@ -504,7 +504,7 @@ export function TaskPanel({ taskId, project, onOpen, onClose, onNotice = () => {
             {task?.parent_task_id ? (
               <>
                 {' · '}
-                <button type="button" className="text-primary hover:underline" onClick={() => onOpen(task.parent_task_id)}>
+                <button type="button" className="text-brand-text hover:underline" onClick={() => onOpen(task.parent_task_id)}>
                   ↑ {t('tasks.panel.subtasks')}
                 </button>
               </>
