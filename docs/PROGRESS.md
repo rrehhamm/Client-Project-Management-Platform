@@ -13,7 +13,28 @@
 | 4 | Comments, notifications, files with virus scan, dashboards, search, audit log, security review, production deployment — released as `v0.4.0-mvp` | Approved |
 | After MVP | Quieter notification defaults (D-35), one "active projects" definition (D-36), image thumbnails (D-37), bundled or external S3 storage (D-38), provider-neutral deployment (D-39), 30-day backups | Approved |
 
-## Phase 5 (client portal and approvals): in progress
+## UI design phase (D-45): in progress
+
+Design system in [DESIGN.md](DESIGN.md). Steps, one commit each, all tests green after each:
+
+0. **Done, awaiting approval:**
+   - tokens (`client/src/styles/tokens.css`) with contrast tests;
+   - brand-colour contrast protection (`lib/brand.js`);
+   - appearance helper (`lib/appearance.js`);
+   - the self-hosted font;
+   - the design preview at `/design-preview.html` (dev server).
+   - Nothing in the app has changed yet. Bundle baseline: 156.02 KB JS, 7.36 KB CSS (gzipped).
+1. Foundation: wire the tokens and font into the app, and restyle `ui/` components and status badges. Before-screenshots are taken first.
+2. Frame: sidebar `InternalLayout`, top bar, `PageHeader`, `StateViews`, `AuthLayout`, appearance setting (per user, server-stored), brand colour applied app-wide.
+3. Libraries within the D-45 limits: 21st.dev, GSAP, React Bits. Bundle size is reported against the 30 KB limit.
+4. Dashboard.
+5. Projects and clients.
+6. Tasks (list, board, calendar, panel).
+7. Files, comments, activity, notifications.
+8. Portal and approval screens.
+9. Contrast scan, before/after screenshots, report.
+
+## Phase 5 (client portal and approvals): paused
 
 Decisions D-40…D-44 in [DECISIONS.md](DECISIONS.md).
 

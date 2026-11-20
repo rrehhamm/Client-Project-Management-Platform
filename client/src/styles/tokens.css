@@ -1,0 +1,184 @@
+/*
+ * D-45 design tokens: "Clean Professional SaaS". The only place colours, radii, shadows,
+ * fonts and motion timings are defined. Components use the Tailwind names mapped in
+ * @theme below (bg-card, text-brand-text, shadow-card...), never raw hex values.
+ *
+ * Modes: <html class="light"> or <html class="dark">, set by src/lib/appearance.js from the
+ * user's setting (System / Light / Dark). Brand tokens (--primary, --primary-foreground,
+ * --brand-text, --brand-soft, --ring) are the defaults for #2563EB; src/lib/brand.js
+ * overrides them per workspace with contrast-checked values. Status colours are fixed.
+ * Every text pair here is at least 4.5:1 (WCAG AA); input borders are at least 3:1.
+ * See docs/DESIGN.md.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --accent: #f1f5f9; /* hover surface for ghost and outline controls */
+  --accent-foreground: #0f172a;
+  --sidebar: #ffffff;
+  --border: #e2e8f0;
+  --input: #8492a6;
+  --overlay: rgb(15 23 42 / 0.5);
+
+  /* Brand (workspace colour, replaced at runtime by brand.js) */
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --brand-text: #2461e6;
+  --brand-soft: #e9effd;
+  --ring: #2461e6;
+
+  /* Status (fixed) */
+  --success: #166534;
+  --warning: #92400e;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --info: #0369a1;
+  --status-soft: 8%;
+
+  /* Elevation: two levels only */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-overlay:
+    0 16px 40px -12px rgb(15 23 42 / 0.25), 0 4px 12px -4px rgb(15 23 42 / 0.1);
+}
+
+:root.dark {
+  color-scheme: dark;
+
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #172033;
+  --card-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --secondary: #1e293b;
+  --secondary-foreground: #f1f5f9;
+  --accent: #1e293b;
+  --accent-foreground: #f1f5f9;
+  --sidebar: #0b1220;
+  --border: #263247;
+  --input: #64748b;
+  --overlay: rgb(2 6 23 / 0.7);
+
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --brand-text: #789ef3;
+  --brand-soft: #283756;
+  --ring: #789ef3;
+
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --destructive: #f87171;
+  --destructive-foreground: #0f172a;
+  --info: #38bdf8;
+  --status-soft: 15%;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-overlay:
+    0 16px 40px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-overlay: var(--overlay);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand-text: var(--brand-text);
+  --color-brand-soft: var(--brand-soft);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-success-soft: color-mix(
+    in srgb,
+    var(--success) var(--status-soft),
+    var(--card)
+  );
+  --color-warning-soft: color-mix(
+    in srgb,
+    var(--warning) var(--status-soft),
+    var(--card)
+  );
+  --color-destructive-soft: color-mix(
+    in srgb,
+    var(--destructive) var(--status-soft),
+    var(--card)
+  );
+  --color-info-soft: color-mix(
+    in srgb,
+    var(--info) var(--status-soft),
+    var(--card)
+  );
+
+  --shadow-card: var(--shadow-card);
+  --shadow-overlay: var(--shadow-overlay);
+}
+
+@theme {
+  /* Plus Jakarta Sans (self-hosted via @fontsource). Arabic needs a companion font later. */
+  --font-sans:
+    "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+
+  /* Radius: 8px for controls and cards, 12px for dialogs. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  /* Motion: 150–300 ms, ease-out; reduced motion turns it off (see base layer). */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

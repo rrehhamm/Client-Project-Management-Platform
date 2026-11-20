@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* The D-45 design preview is development-only; keep its classes out of the app CSS. */
+@source not "./design-preview";
+@source not "../design-preview.html";
+
 /* Dark mode follows the OS setting (Tailwind's default dark: variant matches). */
 
 /* shadcn/ui design tokens. Brand colour is applied per workspace later (FR-WS-01). */
