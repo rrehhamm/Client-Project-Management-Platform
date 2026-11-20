@@ -1,7 +1,6 @@
 // Frame for the internal app (D-45): a sidebar with icon and label per section (only the
 // pages the role can use), collapsible on desktop and a drawer below 768 px; a slim top bar
 // for search and notifications. Logical CSS (start/end) so it mirrors for RTL later.
-import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   Building2,
   FolderKanban,
@@ -16,9 +15,8 @@ import {
   Search,
   Settings,
   Users,
-  X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router';
 import { useLogout, useMe } from '@/api/auth';
 import { useWorkspace } from '@/api/workspace';
@@ -28,6 +26,7 @@ import { SearchBox } from '@/features/search/SearchBox';
 import { t } from '@/i18n';
 import { cn } from '@/lib/utils';
 
+const MobileNav = lazy(() => import('./MobileNav'));
 const SIDEBAR_KEY = 'cpm.sidebar';
 const focusRing = 'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar';
 
@@ -185,31 +184,14 @@ export function InternalLayout() {
         <SidebarBody me={me} collapsed={collapsed} onSignOut={signOut} signingOut={logout.isPending} />
       </aside>
 
-      {/* Mobile drawer */}
-      <DialogPrimitive.Root open={drawer} onOpenChange={setDrawer}>
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-overlay md:hidden" />
-          <DialogPrimitive.Content
-            aria-describedby={undefined}
-            className="fixed inset-y-0 start-0 z-50 flex w-72 max-w-[85vw] flex-col border-e bg-sidebar shadow-overlay outline-none md:hidden"
-          >
-            <div className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-              <DialogPrimitive.Title asChild>
-                <div className="min-w-0 flex-1">
-                  <Brand me={me} logoUrl={logoUrl} />
-                </div>
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Close
-                aria-label={t('nav.closeMenu')}
-                className={cn('cursor-pointer rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground', focusRing)}
-              >
-                <X aria-hidden="true" className="size-4" />
-              </DialogPrimitive.Close>
-            </div>
+      {/* Mobile drawer: its dialog code loads on first open, keeping the main bundle small. */}
+      {drawer ? (
+        <Suspense fallback={null}>
+          <MobileNav open={drawer} onOpenChange={setDrawer} header={<Brand me={me} logoUrl={logoUrl} />}>
             <SidebarBody me={me} collapsed={false} onNavigate={() => setDrawer(false)} onSignOut={signOut} signingOut={logout.isPending} />
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
+          </MobileNav>
+        </Suspense>
+      ) : null}
 
       <div className={cn('flex min-h-dvh flex-col transition-[padding] duration-200', collapsed ? 'md:ps-16' : 'md:ps-60')}>
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur sm:px-6">
