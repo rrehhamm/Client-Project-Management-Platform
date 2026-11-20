@@ -314,6 +314,8 @@ model User {
   avatar_key                String?    @db.VarChar(512)
   /// Personal display timezone; null = workspace timezone (NFR-TZ-01)
   timezone                  String?    @db.VarChar(64)
+  /// D-45 appearance: system | light | dark (CHECK in migration)
+  appearance                String     @default("system") @db.VarChar(10)
   hourly_cost_rate          BigInt?
   default_bill_rate         BigInt?
   /// FR-USER-09: default 40 h/week
@@ -422,6 +424,8 @@ model ClientContact {
   last_login_at        DateTime?     @db.Timestamptz(3)
   /// FR-NOT-03 for contacts: only the events they changed (D-35)
   notification_prefs   Json?
+  /// D-45 appearance: system | light | dark (CHECK in migration)
+  appearance           String        @default("system") @db.VarChar(10)
   /// NFR-PRIV-02: set when personal data was replaced; the record stays for history
   anonymised_at        DateTime?     @db.Timestamptz(3)
   created_at           DateTime      @default(now()) @db.Timestamptz(3)

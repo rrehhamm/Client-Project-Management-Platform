@@ -4,6 +4,7 @@ import { LogOut, UserRound } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useLogout, useMe } from '@/api/auth';
 import { usePortalBranding } from '@/api/portal';
+import { useThemeSync } from '@/components/ThemeSync';
 import { Button } from '@/components/ui/button';
 import { NotificationBell } from '@/features/notifications/NotificationBell';
 import { t } from '@/i18n';
@@ -16,6 +17,7 @@ const navClass = ({ isActive }) => cn('rounded-md px-3 py-2 text-sm font-medium 
 export function PortalLayout() {
   const { data: me } = useMe();
   const brand = usePortalBranding().data;
+  useThemeSync(me); // D-45: own appearance and the agency's colour
   const logout = useLogout();
   const navigate = useNavigate();
   const signOut = () => logout.mutate(undefined, { onSettled: () => navigate('/login', { replace: true }) });

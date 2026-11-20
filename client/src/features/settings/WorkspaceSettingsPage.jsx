@@ -22,7 +22,7 @@ import { formatBytes } from '@/features/files/format';
 
 const schema = z.object({
   name: z.string().trim().min(1).max(120),
-  brand_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use a colour like #2563EB'),
+  brand_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Use a colour like #3E5BA3'),
   timezone: z.string().min(1),
   currency: z.string(),
   date_format: z.string(),
@@ -35,7 +35,7 @@ function SettingsForm({ ws }) {
     resolver: zodResolver(schema),
     defaultValues: {
       name: ws.name,
-      brand_color: ws.brand_color ?? '#2563EB',
+      brand_color: ws.brand_color ?? '#3E5BA3',
       timezone: ws.timezone,
       currency: ws.currency,
       date_format: ws.date_format,

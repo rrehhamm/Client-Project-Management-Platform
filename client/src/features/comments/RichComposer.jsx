@@ -139,7 +139,7 @@ export default function RichComposer({ people = [], onSubmit, onCancel, submitLa
         {placeholder}
       </p>
       {matches.length ? (
-        <ul ref={listRef} id={listId} aria-label={t('comments.mentionList')} className="absolute left-2 z-30 mt-1 w-64 rounded-md border bg-popover p-1 shadow-md">
+        <ul ref={listRef} id={listId} aria-label={t('comments.mentionList')} className="absolute start-2 z-30 mt-1 w-64 rounded-md border bg-card p-1 shadow-overlay">
           {matches.map((p, i) => (
             <li key={p.id}>
               <button

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { applyAppearance } from '@/lib/appearance';
 import { ApiError, apiFetch } from './client';
 
 export const meKey = ['me'];
@@ -73,6 +74,26 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: (body) => apiFetch('/auth/me', { method: 'PATCH', body }),
     onSuccess: (data) => qc.setQueryData(meKey, data),
+  });
+}
+
+/** D-45: applies the theme at once, then saves it for the user (last write wins). */
+export function useUpdateAppearance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (appearance) => apiFetch('/auth/me/appearance', { method: 'PUT', body: { appearance } }),
+    onMutate: (appearance) => {
+      applyAppearance(appearance);
+      const prev = qc.getQueryData(meKey);
+      if (prev) qc.setQueryData(meKey, { ...prev, principal: { ...prev.principal, appearance } });
+      return { prev };
+    },
+    onError: (_err, _v, ctx) => {
+      if (ctx?.prev) {
+        qc.setQueryData(meKey, ctx.prev);
+        applyAppearance(ctx.prev.principal.appearance);
+      }
+    },
   });
 }
 

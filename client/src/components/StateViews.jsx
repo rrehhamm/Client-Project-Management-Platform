@@ -16,13 +16,19 @@ export function LoadingState({ rows = 3 }) {
   );
 }
 
-function Message({ icon: Icon, title, body, children, role }) {
+// D-45: the icon sits in a soft round tile; errors use the danger tint.
+function Message({ icon: Icon, title, body, children, role, tone = 'muted' }) {
   return (
-    <div role={role} className="flex flex-col items-center gap-3 px-4 py-10 text-center">
-      <Icon aria-hidden="true" className="size-10 text-muted-foreground" />
-      <h2 className="text-base font-semibold">{title}</h2>
+    <div role={role} className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+      <span
+        aria-hidden="true"
+        className={tone === 'danger' ? 'mb-1 flex size-11 items-center justify-center rounded-full bg-destructive-soft text-destructive' : 'mb-1 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground'}
+      >
+        <Icon className="size-5" />
+      </span>
+      <h2 className="text-sm font-semibold">{title}</h2>
       {body ? <p className="max-w-md text-sm text-muted-foreground">{body}</p> : null}
-      {children}
+      {children ? <div className="mt-2">{children}</div> : null}
     </div>
   );
 }
@@ -37,7 +43,7 @@ export function EmptyState({ title = t('states.emptyTitle'), body, action }) {
 
 export function ErrorState({ error, onRetry }) {
   return (
-    <Message icon={AlertTriangle} title={t('states.errorTitle')} body={error?.message ?? t('states.errorBody')} role="alert">
+    <Message icon={AlertTriangle} title={t('states.errorTitle')} body={error?.message ?? t('states.errorBody')} role="alert" tone="danger">
       {onRetry ? (
         <Button variant="outline" onClick={onRetry}>
           {t('states.retry')}
@@ -48,5 +54,5 @@ export function ErrorState({ error, onRetry }) {
 }
 
 export function UnauthorizedState() {
-  return <Message icon={Lock} title={t('states.unauthorizedTitle')} body={t('states.unauthorizedBody')} role="alert" />;
+  return <Message icon={Lock} title={t('states.unauthorizedTitle')} body={t('states.unauthorizedBody')} role="alert" tone="danger" />;
 }

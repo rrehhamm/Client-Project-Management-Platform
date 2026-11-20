@@ -52,6 +52,10 @@ export const profileUpdateSchema = z.object({
   version: z.number().int().positive(),
 });
 
+/** D-45: per-user appearance. A display preference, so last write wins (no version). */
+export const APPEARANCES = ['system', 'light', 'dark'];
+export const appearanceSchema = z.object({ appearance: z.enum(APPEARANCES, { message: 'Choose System, Light or Dark' }) });
+
 export const emailChangeSchema = z.object({
   new_email: emailSchema,
   current_password: z.string().min(1, 'Enter your current password').max(1024),

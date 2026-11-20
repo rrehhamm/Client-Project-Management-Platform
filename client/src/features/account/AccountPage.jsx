@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { changePasswordSchema, emailChangeSchema, passwordSchema } from '@cpm/shared';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useChangePassword, useMe, useRequestEmailChange, useUpdateProfile } from '@/api/auth';
+import { Monitor, Moon, Sun } from 'lucide-react';
+import { useChangePassword, useMe, useRequestEmailChange, useUpdateAppearance, useUpdateProfile } from '@/api/auth';
 import { applyFieldErrors } from '@/api/client';
 import { FormField } from '@/components/FormField';
 import { Alert } from '@/components/ui/alert';
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { t } from '@/i18n';
 import { timeZones } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { AvatarForm, NotificationPrefsForm } from './AccountExtras';
 
 const profileFormSchema = z.object({
@@ -133,6 +135,59 @@ function PasswordForm() {
   );
 }
 
+const APPEARANCE_OPTIONS = [
+  ['system', Monitor],
+  ['light', Sun],
+  ['dark', Moon],
+];
+
+/** D-45: System (default), Light or Dark, saved per user. Arrow keys move between options. */
+function AppearanceForm({ me }) {
+  const update = useUpdateAppearance();
+  const current = me.principal.appearance ?? 'system';
+  const onKeyDown = (e, i) => {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = APPEARANCE_OPTIONS[(i + step + APPEARANCE_OPTIONS.length) % APPEARANCE_OPTIONS.length][0];
+    update.mutate(next);
+    e.currentTarget.parentElement.querySelector(`[data-value="${next}"]`)?.focus();
+  };
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">{t('account.appearance.hint')}</p>
+      <div role="radiogroup" aria-label={t('account.appearance.label')} className="grid gap-2 sm:grid-cols-3">
+        {APPEARANCE_OPTIONS.map(([value, Icon], i) => {
+          const checked = current === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              data-value={value}
+              aria-checked={checked}
+              tabIndex={checked ? 0 : -1}
+              onClick={() => update.mutate(value)}
+              onKeyDown={(e) => onKeyDown(e, i)}
+              className={cn(
+                'flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-start text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
+                checked ? 'border-brand-text bg-brand-soft' : 'hover:bg-accent',
+              )}
+            >
+              <Icon aria-hidden="true" className={cn('size-4 shrink-0', checked ? 'text-brand-text' : 'text-muted-foreground')} />
+              <span>
+                <span className="block font-medium">{t(`account.appearance.${value}`)}</span>
+                {value === 'system' ? <span className="block text-xs text-muted-foreground">{t('account.appearance.systemHint')}</span> : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {update.error ? <Alert variant="destructive">{update.error.message}</Alert> : null}
+    </div>
+  );
+}
+
 export function AccountPage() {
   const { data: me } = useMe();
   return (
@@ -154,6 +209,14 @@ export function AccountPage() {
         </CardHeader>
         <CardContent>
           <ProfileForm me={me} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('account.appearance.title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AppearanceForm me={me} />
         </CardContent>
       </Card>
       <Card>

@@ -25,7 +25,7 @@ Design system in [DESIGN.md](DESIGN.md). Steps, one commit each, all tests green
    - the design preview at `/design-preview.html` (dev server).
    - Nothing in the app has changed yet. Bundle baseline: 156.02 KB JS, 7.36 KB CSS (gzipped).
 1. **Done:** Foundation: wire the tokens and font into the app, and restyle `ui/` components and status badges. Before-screenshots are taken first.
-2. Frame: sidebar `InternalLayout`, top bar, `PageHeader`, `StateViews`, `AuthLayout`, appearance setting (per user, server-stored), brand colour applied app-wide. Change the default brand colour from `#2563EB` to Dusk Blue `#3E5BA3` in the seed, the settings form and its hint text.
+2. **Done:** Frame: sidebar `InternalLayout`, top bar, `PageHeader`, `StateViews`, `AuthLayout`, appearance setting (per user, server-stored), brand colour applied app-wide. Change the default brand colour from `#2563EB` to Dusk Blue `#3E5BA3` in the seed, the settings form and its hint text.
 3. Libraries within the D-45 limits: 21st.dev, GSAP, React Bits. Bundle size is reported against the 30 KB limit.
 4. Dashboard.
 5. Projects and clients.

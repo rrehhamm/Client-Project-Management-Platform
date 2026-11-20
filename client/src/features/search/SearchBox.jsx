@@ -25,11 +25,11 @@ export function SearchResults({ data, onPick }) {
     <div className="divide-y">
       {groups.map((g) => (
         <section key={g} aria-label={t(`search.groups.${g}`)} className="py-1">
-          <h3 className="px-3 py-1 text-xs font-semibold uppercase text-muted-foreground">{t(`search.groups.${g}`)}</h3>
+          <h3 className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{t(`search.groups.${g}`)}</h3>
           <ul>
             {data.groups[g].map((r) => (
               <li key={r.id}>
-                <button type="button" onClick={() => onPick(r)} className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none">
+                <button type="button" onClick={() => onPick(r)} className="flex w-full cursor-pointer items-baseline gap-2 px-3 py-1.5 text-start text-sm hover:bg-accent focus:bg-accent focus:outline-none">
                   <span className="truncate">{r.title}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">{r.subtitle}</span>
                 </button>
@@ -75,7 +75,7 @@ export function SearchBox() {
         }
       }}
     >
-      <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+      <Search aria-hidden="true" className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         type="search"
         aria-label={t('search.label')}
@@ -87,10 +87,10 @@ export function SearchBox() {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-        className="h-9 w-44 pl-8 md:w-56"
+        className="h-9 w-full bg-background ps-8 shadow-none"
       />
       {open && q.trim().length > 0 ? (
-        <div className="absolute right-0 z-40 mt-1 max-h-96 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border bg-popover shadow-lg" aria-live="polite">
+        <div className="absolute start-0 z-40 mt-1 max-h-96 w-full min-w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border bg-card shadow-overlay" aria-live="polite">
           {q.trim().length < 2 ? (
             <p className="p-3 text-sm text-muted-foreground">{t('search.min')}</p>
           ) : results.isPending ? (

@@ -488,6 +488,27 @@ describe('own profile (FR-AUTH-13)', () => {
     expect(await db.user.findUniqueOrThrow({ where: { id: u.id } })).toMatchObject({ role: 'TeamMember', email: u.email, full_name: u.full_name });
   });
 
+  it('D-45: stores the appearance per user and per contact, without bumping the profile version', async () => {
+    const u = await W.addUser();
+    const c = await loginAs(app, u.email);
+    const before = (await c.get('/api/v1/auth/me')).body.principal;
+    expect(before.appearance).toBe('system');
+    const res = await c.put('/api/v1/auth/me/appearance', { appearance: 'dark' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ appearance: 'dark' });
+    const after = (await c.get('/api/v1/auth/me')).body.principal;
+    expect(after).toMatchObject({ appearance: 'dark', version: before.version });
+
+    const bad = await c.put('/api/v1/auth/me/appearance', { appearance: 'purple' });
+    expect(bad.status).toBe(422);
+    expect(bad.body.fields[0]).toMatchObject({ field: 'appearance' });
+
+    const contact = await loginAs(app, W.contacts.maya.email);
+    expect((await contact.put('/api/v1/auth/me/appearance', { appearance: 'light' })).status).toBe(200);
+    expect((await contact.get('/api/v1/auth/me')).body.principal.appearance).toBe('light');
+    expect((await (await client(app)).put('/api/v1/auth/me/appearance', { appearance: 'dark' })).status).toBe(401);
+  });
+
   it('rejects an unknown timezone', async () => {
     const u = await W.addUser();
     const c = await loginAs(app, u.email);

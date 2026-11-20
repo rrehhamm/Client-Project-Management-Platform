@@ -10,7 +10,7 @@ export const LOGO_TYPES = Object.freeze(['image/png', 'image/svg+xml']);
 export const workspaceUpdateSchema = z
   .object({
     name: trimmedString(1, 120),
-    brand_color: z.string().regex(BRAND_COLOR_RE, 'Use a colour like #2563EB').nullable(),
+    brand_color: z.string().regex(BRAND_COLOR_RE, 'Use a colour like #3E5BA3').nullable(),
     timezone: timeZoneSchema,
     currency: currencySchema,
     date_format: z.enum(DATE_FORMATS),

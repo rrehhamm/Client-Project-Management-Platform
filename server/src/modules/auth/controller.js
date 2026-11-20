@@ -33,6 +33,10 @@ export async function updateProfile(req, res) {
   res.json(await service.updateProfile(req.principal, req.body, req));
 }
 
+export async function updateAppearance(req, res) {
+  res.json(await service.updateAppearance(req.principal, req.body));
+}
+
 export async function requestEmailChange(req, res) {
   await service.requestEmailChange(req.principal, req.body, req);
   res.status(202).json({ message: 'Check your new email address for a confirmation link' });

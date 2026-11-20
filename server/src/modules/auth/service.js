@@ -196,6 +196,7 @@ export async function getMe(principal) {
       role: principal.kind === 'user' ? record.role : null,
       phone: record.phone,
       timezone: record.timezone,
+      appearance: record.appearance, // D-45
       version: record.version,
       has_avatar: Boolean(record.avatar_key), // FR-AUTH-13
       client: principal.kind === 'contact' ? record.client : null,
@@ -234,6 +235,13 @@ export async function updateProfile(principal, { version, ...changes }, req) {
     after: pick(after, PROFILE_FIELDS),
   });
   return getMe(principal);
+}
+
+/** D-45: appearance is a display preference; it does not bump the profile version or the audit log. */
+export async function updateAppearance(principal, { appearance }) {
+  const model = principal.kind === 'user' ? db.user : db.clientContact;
+  await model.update({ where: { id: principal.id }, data: { appearance } });
+  return { appearance };
 }
 
 async function emailInUse(email) {

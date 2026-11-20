@@ -2,6 +2,7 @@
 // Public routes have no principal to authorize; they are rate limited per IP.
 import {
   acceptInviteSchema,
+  appearanceSchema,
   changePasswordSchema,
   emailChangeSchema,
   forgotPasswordSchema,
@@ -29,6 +30,7 @@ export function createAuthRouter({ authLimiter }) {
 
   router.get('/me', requireAuth, controller.me);
   router.patch('/me', requireAuth, validateBody(profileUpdateSchema), controller.updateProfile);
+  router.put('/me/appearance', requireAuth, validateBody(appearanceSchema), controller.updateAppearance); // D-45
   router.post('/me/email-change', requireAuth, validateBody(emailChangeSchema), controller.requestEmailChange);
   router.post('/email/verify', authLimiter, validateBody(verifyEmailSchema), controller.verifyEmail);
 

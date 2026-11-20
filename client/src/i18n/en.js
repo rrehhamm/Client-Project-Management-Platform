@@ -428,6 +428,11 @@ export const en = {
     search: 'Search',
     notifications: 'Notifications',
     mainNavigation: 'Main navigation',
+    workspaceSection: 'Workspace',
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
     signedInAs: 'Signed in as {name}',
   },
   roles: {
@@ -718,6 +723,15 @@ export const en = {
   },
   account: {
     title: 'Your account',
+    appearance: {
+      title: 'Appearance',
+      hint: 'Applies to you only, on every device you sign in on.',
+      label: 'Theme',
+      system: 'System',
+      systemHint: 'Follow this device',
+      light: 'Light',
+      dark: 'Dark',
+    },
     avatar: {
       title: 'Profile photo',
       body: 'PNG, JPEG or WebP, up to 2 MB.',

@@ -7,11 +7,11 @@ export function AppShell() {
     <div className="min-h-dvh">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-md focus:bg-background focus:px-3 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:rounded-md focus:bg-card focus:px-3 focus:py-2"
       >
         {t('app.skipToContent')}
       </a>
-      <header className="border-b">
+      <header className="border-b bg-card">
         <div className="mx-auto flex h-14 max-w-6xl items-center px-4">
           <Link to="/" className="font-semibold tracking-tight">
             {t('app.name')}

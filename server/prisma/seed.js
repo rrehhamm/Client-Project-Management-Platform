@@ -76,7 +76,7 @@ async function main() {
   const workspace =
     (await db.workspace.findFirst({ where: { name: 'Nexa' } })) ??
     (await db.workspace.create({
-      data: { name: 'Nexa', timezone: 'Asia/Amman', currency: 'JOD', week_start_day: 0, brand_color: '#2563EB' },
+      data: { name: 'Nexa', timezone: 'Asia/Amman', currency: 'JOD', week_start_day: 0, brand_color: '#3E5BA3' },
     }));
   const ws = workspace.id;
 

@@ -116,8 +116,13 @@ test('phone width (light)', async ({ browser }) => {
   const page = await ctx.newPage();
   await page.goto('/login');
   await shot(page, 'mobile-01-login');
-  await signIn(page, 'lina.pm@nexa.test');
+  await signIn(page, 'lina.pm@nexa.test', true); // the sidebar is a drawer at phone width
   await shot(page, 'mobile-02-dashboard');
+  await tryStep(async () => {
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await shot(page, 'mobile-02b-menu');
+    await page.getByRole('button', { name: 'Close menu' }).click();
+  });
   await page.goto('/projects');
   await shot(page, 'mobile-03-projects');
   await page.goto('/my-tasks');

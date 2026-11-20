@@ -53,7 +53,7 @@ export function NotificationBell() {
         ) : null}
       </Button>
       {open ? (
-        <div role="dialog" aria-label={t('notifications.title')} className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border bg-popover shadow-lg">
+        <div role="dialog" aria-label={t('notifications.title')} className="absolute end-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border bg-card shadow-overlay">
           <div className="flex items-center justify-between border-b px-3 py-2">
             <h2 className="text-sm font-semibold">{t('notifications.title')}</h2>
             <Button variant="ghost" size="sm" disabled={!count || markAll.isPending} onClick={() => markAll.mutate()}>
