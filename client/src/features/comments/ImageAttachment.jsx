@@ -3,22 +3,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { fileUrl } from '@/api/comms';
+import { useApiBase } from '@/lib/apiScope';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { t } from '@/i18n';
 
 export function ImageAttachment({ attachment }) {
+  const base = useApiBase();
   const [open, setOpen] = useState(false);
   // Signed links last 10 minutes (FR-FILE-04); reuse one for up to 8
   const link = useQuery({
-    queryKey: ['files', 'preview', attachment.file_id, attachment.version_no],
-    queryFn: () => fileUrl(attachment.file_id, attachment.version_no, { inline: true }),
+    queryKey: ['files', 'preview', base, attachment.file_id, attachment.version_no],
+    queryFn: () => fileUrl(attachment.file_id, attachment.version_no, { inline: true, base }),
     staleTime: 8 * 60_000,
     gcTime: 8 * 60_000,
   });
   const download = async () => {
-    const { url } = await fileUrl(attachment.file_id, attachment.version_no);
+    const { url } = await fileUrl(attachment.file_id, attachment.version_no, { base });
     window.location.assign(url);
   };
 

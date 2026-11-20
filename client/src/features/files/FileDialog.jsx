@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { CommentThread, InternalTag } from '@/features/comments/CommentThread';
+import { FileApprovalHistory } from '@/features/approvals/ApprovalPages';
+import { RequestApprovalDialog } from '@/features/approvals/RequestApprovalDialog';
 import { FollowButton } from '@/features/notifications/FollowButton';
 import { t } from '@/i18n';
 import { formatDateTime } from '@/lib/format';
@@ -65,6 +67,7 @@ function Details({ file, project, onClose }) {
   const [name, setName] = useState(file.name);
   const [progress, setProgress] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
   const input = useRef(null);
   const p = file.permissions;
@@ -99,6 +102,12 @@ function Details({ file, project, onClose }) {
           </label>
         ) : null}
         <FollowButton entityType="File" entityId={file.id} />
+        {/* FR-APP-01: only the latest, scanned version of a Client file, on a portal project */}
+        {project.permissions.request_approval && project.portal_enabled && file.visibility === 'Client' && file.latest?.scan_status === 'Clean' ? (
+          <Button variant="outline" onClick={() => setRequesting(true)}>
+            {t('approvals.request')}
+          </Button>
+        ) : null}
       </div>
 
       {p.update ? (
@@ -173,7 +182,10 @@ function Details({ file, project, onClose }) {
         </ul>
       </section>
 
+      <FileApprovalHistory fileId={file.id} />
+
       <CommentThread entityType="File" entityId={file.id} project={project} targetVisibility={file.visibility} />
+      {requesting ? <RequestApprovalDialog project={project} subject={{ file_version_id: file.latest.id, name: file.name }} onOpenChange={setRequesting} /> : null}
 
       {p.delete ? (
         <div className="border-t pt-4">

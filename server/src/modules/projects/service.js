@@ -113,6 +113,7 @@ export async function getProjectDetail(viewer, project) {
         upload_file: can(viewer, 'file.create', ctx), // FR-FILE-01
         manage_files: can(viewer, 'file.update', ctx), // folders, sharing (FR-FILE-05/07)
         comment: can(viewer, 'comment.create', ctx),
+        request_approval: can(viewer, 'approval.request', ctx), // FR-APP-01
       },
     },
   });

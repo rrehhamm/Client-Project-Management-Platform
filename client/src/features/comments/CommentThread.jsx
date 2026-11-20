@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { t } from '@/i18n';
 import { formatDateTime } from '@/lib/format';
+import { useApiBase } from '@/lib/apiScope';
 import { safeHtml } from '@/lib/safeHtml';
 import { ImageAttachment } from './ImageAttachment';
 
@@ -45,12 +46,13 @@ export function Avatar({ person, size = 'size-8' }) {
   );
 }
 
-async function openAttachment(a) {
-  const { url } = await fileUrl(a.file_id, a.version_no);
+async function openAttachment(a, base) {
+  const { url } = await fileUrl(a.file_id, a.version_no, { base });
   window.open(url, '_blank', 'noopener');
 }
 
 function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
+  const base = useApiBase();
   const edit = useEditComment();
   const remove = useDeleteComment();
   const [editing, setEditing] = useState(false);
@@ -82,7 +84,7 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
               onCancel={() => setEditing(false)}
               onSubmit={({ body, mention_user_ids }) =>
                 edit
-                  .mutateAsync({ id: c.id, body, mention_user_ids: [...new Set([...c.mentions.map((m) => m.id), ...mention_user_ids])], version: c.version })
+                  .mutateAsync(base ? { id: c.id, body, version: c.version } : { id: c.id, body, mention_user_ids: [...new Set([...c.mentions.filter((m) => m.id && !m.kind).map((m) => m.id), ...mention_user_ids])], version: c.version })
                   .then(() => setEditing(false))
                   .catch(() => false)
               }
@@ -100,7 +102,7 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
                 {isThumbnailable(a) ? (
                   <ImageAttachment attachment={a} />
                 ) : (
-                <button type="button" className="flex items-center gap-1 rounded border px-2 py-0.5 text-xs hover:bg-accent disabled:opacity-60" disabled={a.scan_status !== 'Clean'} onClick={() => openAttachment(a)}>
+                <button type="button" className="flex items-center gap-1 rounded border px-2 py-0.5 text-xs hover:bg-accent disabled:opacity-60" disabled={a.scan_status !== 'Clean'} onClick={() => openAttachment(a, base)}>
                   <Paperclip aria-hidden="true" className="size-3" />
                   {a.name}
                   {a.scan_status === 'Pending' ? ` (${t('comments.scanning')})` : ''}
@@ -117,12 +119,12 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
                 {replyCount ? t('comments.showReplies', { count: replyCount }) : t('comments.reply')}
               </button>
             ) : null}
-            {c.permissions.edit ? (
+            {(c.permissions?.edit ?? c.can_edit) ? (
               <button type="button" className="text-muted-foreground hover:underline" onClick={() => setEditing(true)}>
                 {t('comments.edit')}
               </button>
             ) : null}
-            {c.permissions.delete ? (
+            {(c.permissions?.delete ?? c.can_delete) ? (
               <button type="button" className="text-muted-foreground hover:underline" onClick={() => setConfirming(true)}>
                 {t('comments.delete')}
               </button>
@@ -149,7 +151,8 @@ function CommentItem({ comment, people, timeZone, onReply, replyCount }) {
  * Composer with visibility and attachments. `targetVisibility` = the commented record's
  * visibility: Client comments are offered only on Client-visible records.
  */
-export function CommentComposer({ entityType, entityId, project, targetVisibility = 'Internal', parentId, parentVisibility, placeholder, people }) {
+export function CommentComposer({ entityType, entityId, project, targetVisibility = 'Internal', parentId, parentVisibility, placeholder, people, contacts = [] }) {
+  const base = useApiBase();
   const { data: me } = useMe();
   const postComment = usePostComment();
   const addMember = useAddMember();
@@ -163,6 +166,10 @@ export function CommentComposer({ entityType, entityId, project, targetVisibilit
 
   const blocked = postComment.error?.fields?.filter((f) => f.field === 'mention_user_ids' && f.user_id) ?? [];
 
+  // FR-COM-03: contacts can be mentioned only in Client comments
+  const mentionPeople = canShare && visibility === 'Client' ? [...people, ...contacts.map((c) => ({ ...c, isContact: true }))] : people;
+  const contactIds = new Set(contacts.map((c) => c.id));
+
   const send = (value) => {
     lastBody.current = value;
     return postComment
@@ -171,7 +178,12 @@ export function CommentComposer({ entityType, entityId, project, targetVisibilit
         entity_id: entityId,
         body: value.body,
         visibility: canShare ? visibility : undefined,
-        mention_user_ids: value.mention_user_ids,
+        ...(base
+          ? {}
+          : {
+              mention_user_ids: value.mention_user_ids.filter((id) => !contactIds.has(id)),
+              mention_contact_ids: value.mention_user_ids.filter((id) => contactIds.has(id)),
+            }),
         attachment_file_ids: files.map((f) => f.id),
         parent_id: parentId,
       })
@@ -187,7 +199,7 @@ export function CommentComposer({ entityType, entityId, project, targetVisibilit
     setUploading(true);
     try {
       for (const file of [...list].slice(0, COMMENT_MAX_ATTACHMENTS - files.length)) {
-        const saved = await uploadWithProgress(`/projects/${project.id}/files`, file);
+        const saved = await uploadWithProgress(`${base}/projects/${project.id}/files`, file);
         setFiles((f) => [...f, { id: saved.id, name: saved.name }]);
       }
     } catch (err) {
@@ -202,7 +214,7 @@ export function CommentComposer({ entityType, entityId, project, targetVisibilit
     <div className="space-y-2">
       <Suspense fallback={<LoadingState rows={1} />}>
         <RichComposer
-          people={people}
+          people={mentionPeople}
           label={t('comments.label')}
           placeholder={placeholder ?? t('comments.write')}
           submitLabel={postComment.isPending ? t('comments.posting') : t('comments.post')}
@@ -273,7 +285,8 @@ export function CommentComposer({ entityType, entityId, project, targetVisibilit
 export function CommentThread({ entityType, entityId, project, targetVisibility, parentId, parentVisibility, canComment = true, title = t('comments.title'), placeholder }) {
   const { data: me } = useMe();
   const query = useComments({ entity_type: entityType, entity_id: entityId, parent_id: parentId });
-  const people = useMentionable(entityType === 'Project' ? 'Project' : entityType, entityType === 'Project' ? project.id : entityId).data?.data ?? [];
+  const mentionable = useMentionable(entityType === 'Project' ? 'Project' : entityType, entityType === 'Project' ? project.id : entityId).data;
+  const people = mentionable?.data ?? [];
   const timeZone = me.principal.timezone ?? me.workspace.timezone;
 
   return (
@@ -292,7 +305,7 @@ export function CommentThread({ entityType, entityId, project, targetVisibility,
           ))}
         </ol>
       )}
-      {canComment ? <CommentComposer entityType={entityType} entityId={entityId} project={project} targetVisibility={targetVisibility} parentId={parentId} parentVisibility={parentVisibility} placeholder={placeholder} people={people} /> : null}
+      {canComment ? <CommentComposer entityType={entityType} entityId={entityId} project={project} targetVisibility={targetVisibility} parentId={parentId} parentVisibility={parentVisibility} placeholder={placeholder} people={people} contacts={mentionable?.contacts ?? []} /> : null}
     </section>
   );
 }

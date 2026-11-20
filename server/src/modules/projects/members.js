@@ -9,7 +9,7 @@ import { assertWritable } from './common.js';
 
 const memberInclude = {
   user: { select: { id: true, full_name: true, email: true, role: true, status: true } },
-  contact: { select: { id: true, full_name: true, email: true, client_id: true } },
+  contact: { select: { id: true, full_name: true, email: true, client_id: true, portal_access: true } },
 };
 
 /** Contacts see names only (§4.2 Project members row). */
@@ -38,6 +38,7 @@ export function toMemberDto(m, project, viewer) {
     full_name: m.contact.full_name,
     email: m.contact.email,
     portal_level: m.portal_level,
+    portal_access: m.contact.portal_access, // only these can approve (BR-APP-02)
     created_at: m.created_at,
   };
 }

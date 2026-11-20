@@ -33,6 +33,7 @@ import { Assignees, TaskStatusBadge } from './TaskBadges';
 import { useStatusChange } from './useStatusChange';
 import { CommentThread } from '@/features/comments/CommentThread';
 import { FollowButton } from '@/features/notifications/FollowButton';
+import { RequestApprovalDialog } from '@/features/approvals/RequestApprovalDialog';
 
 const RichTextEditor = lazy(() => import('./RichTextEditor'));
 
@@ -311,6 +312,7 @@ function Details({ task, project, me, onOpen, onClose, onNotice }) {
   const remove = useDeleteTask();
   const members = useMembers(project.id);
   const milestones = useMilestones(project.id);
+  const [requesting, setRequesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [applyToSubtasks, setApplyToSubtasks] = useState(false);
   const descId = useId();
@@ -448,9 +450,15 @@ function Details({ task, project, me, onOpen, onClose, onNotice }) {
       {!task.parent_task_id ? <Subtasks task={task} project={project} onOpen={onOpen} /> : null}
       <Checklist task={task} />
       <Dependencies task={task} project={project} onOpen={onOpen} />
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        {project.permissions.request_approval && project.portal_enabled && task.visibility === 'Client' && !project.archived_at ? (
+          <Button variant="outline" size="sm" onClick={() => setRequesting(true)}>
+            {t('approvals.request')}
+          </Button>
+        ) : null}
         <FollowButton entityType="Task" entityId={task.id} />
       </div>
+      {requesting ? <RequestApprovalDialog project={project} subject={{ task_id: task.id, name: task.title }} onOpenChange={setRequesting} /> : null}
       <CommentThread entityType="Task" entityId={task.id} project={project} targetVisibility={task.visibility} canComment={project.permissions.comment && !project.archived_at} />
 
       <div className="space-y-4 border-t pt-4">

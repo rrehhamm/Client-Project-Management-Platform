@@ -1,5 +1,6 @@
 // Phase 4 data: comments, notifications, follows, files, dashboard, search, audit, avatar.
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useApiBase } from '@/lib/apiScope';
 import { ApiError, apiFetch } from './client';
 import { projectsKey } from './projects';
 import { toQueryString } from './query';
@@ -13,25 +14,29 @@ export const COMMENT_POLL_MS = 3000;
 export const commentsKey = ['comments'];
 
 export function useComments({ entity_type, entity_id, parent_id, page_size = 100 }, { enabled = true, poll = true } = {}) {
+  const base = useApiBase();
   return useQuery({
-    queryKey: [...commentsKey, entity_type, entity_id, parent_id ?? null, page_size],
-    queryFn: () => apiFetch(`/comments${toQueryString({ entity_type, entity_id, parent_id, page_size })}`),
+    queryKey: [...commentsKey, base, entity_type, entity_id, parent_id ?? null, page_size],
+    queryFn: () => apiFetch(`${base}/comments${toQueryString({ entity_type, entity_id, parent_id, page_size })}`),
     enabled: Boolean(entity_id) && enabled,
     refetchInterval: poll ? COMMENT_POLL_MS : false,
     refetchIntervalInBackground: false,
   });
 }
 
-export const useMentionable = (entity_type, entity_id) =>
-  useQuery({ queryKey: [...commentsKey, 'mentionable', entity_type, entity_id], queryFn: () => apiFetch(`/comments/mentionable${toQueryString({ entity_type, entity_id })}`), staleTime: 60_000, enabled: Boolean(entity_id) });
-
-function useCommentMutation(mutationFn) {
-  const qc = useQueryClient();
-  return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: commentsKey }) });
+export function useMentionable(entity_type, entity_id) {
+  const base = useApiBase(); // contacts do not mention people (no picker in the portal)
+  return useQuery({ queryKey: [...commentsKey, 'mentionable', entity_type, entity_id], queryFn: () => apiFetch(`/comments/mentionable${toQueryString({ entity_type, entity_id })}`), staleTime: 60_000, enabled: Boolean(entity_id) && !base });
 }
-export const usePostComment = () => useCommentMutation((body) => apiFetch('/comments', { method: 'POST', body }));
-export const useEditComment = () => useCommentMutation(({ id, ...body }) => apiFetch(`/comments/${id}`, { method: 'PATCH', body }));
-export const useDeleteComment = () => useCommentMutation((id) => apiFetch(`/comments/${id}`, { method: 'DELETE' }));
+
+function useCommentMutation(makeFn) {
+  const qc = useQueryClient();
+  const base = useApiBase();
+  return useMutation({ mutationFn: makeFn(base), onSuccess: () => qc.invalidateQueries({ queryKey: commentsKey }) });
+}
+export const usePostComment = () => useCommentMutation((base) => (body) => apiFetch(`${base}/comments`, { method: 'POST', body }));
+export const useEditComment = () => useCommentMutation((base) => ({ id, ...body }) => apiFetch(`${base}/comments/${id}`, { method: 'PATCH', body }));
+export const useDeleteComment = () => useCommentMutation((base) => (id) => apiFetch(`${base}/comments/${id}`, { method: 'DELETE' }));
 
 // ---------------------------------------------------------------------------
 // Notifications (FR-NOT-01; D-31: the bell refreshes every 30 s and on focus)
@@ -40,23 +45,35 @@ export const useDeleteComment = () => useCommentMutation((id) => apiFetch(`/comm
 export const BELL_POLL_MS = 30_000;
 const notificationsKey = ['notifications'];
 
-export const useUnreadCount = () =>
-  useQuery({ queryKey: [...notificationsKey, 'unread'], queryFn: () => apiFetch('/me/notifications/unread-count'), refetchInterval: BELL_POLL_MS, refetchOnWindowFocus: true, staleTime: 10_000 });
+const bellBase = (base) => (base ? `${base}/notifications` : '/me/notifications');
 
-export const useNotifications = ({ enabled = true, page_size = 20 } = {}) =>
-  useQuery({ queryKey: [...notificationsKey, 'list', page_size], queryFn: () => apiFetch(`/me/notifications${toQueryString({ page_size })}`), enabled });
-
-function useNotificationMutation(mutationFn) {
-  const qc = useQueryClient();
-  return useMutation({ mutationFn, onSuccess: () => qc.invalidateQueries({ queryKey: notificationsKey }) });
+export function useUnreadCount() {
+  const base = useApiBase();
+  return useQuery({ queryKey: [...notificationsKey, base, 'unread'], queryFn: () => apiFetch(`${bellBase(base)}/unread-count`), refetchInterval: BELL_POLL_MS, refetchOnWindowFocus: true, staleTime: 10_000 });
 }
-export const useMarkRead = () => useNotificationMutation((id) => apiFetch(`/me/notifications/${id}/read`, { method: 'POST' }));
-export const useMarkAllRead = () => useNotificationMutation(() => apiFetch('/me/notifications/read-all', { method: 'POST' }));
 
-export const usePreferences = () => useQuery({ queryKey: [...notificationsKey, 'prefs'], queryFn: () => apiFetch('/me/notification-preferences') });
+export function useNotifications({ enabled = true, page_size = 20 } = {}) {
+  const base = useApiBase();
+  return useQuery({ queryKey: [...notificationsKey, base, 'list', page_size], queryFn: () => apiFetch(`${bellBase(base)}${toQueryString({ page_size })}`), enabled });
+}
+
+function useNotificationMutation(makeFn) {
+  const qc = useQueryClient();
+  const base = useApiBase();
+  return useMutation({ mutationFn: makeFn(bellBase(base)), onSuccess: () => qc.invalidateQueries({ queryKey: notificationsKey }) });
+}
+export const useMarkRead = () => useNotificationMutation((path) => (id) => apiFetch(`${path}/${id}/read`, { method: 'POST' }));
+export const useMarkAllRead = () => useNotificationMutation((path) => () => apiFetch(`${path}/read-all`, { method: 'POST' }));
+
+const prefsPath = (base) => (base ? `${base}/notification-preferences` : '/me/notification-preferences');
+export function usePreferences() {
+  const base = useApiBase();
+  return useQuery({ queryKey: [...notificationsKey, base, 'prefs'], queryFn: () => apiFetch(prefsPath(base)) });
+}
 export function useSavePreferences() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (body) => apiFetch('/me/notification-preferences', { method: 'PUT', body }), onSuccess: (data) => qc.setQueryData([...notificationsKey, 'prefs'], data) });
+  const base = useApiBase();
+  return useMutation({ mutationFn: (body) => apiFetch(prefsPath(base), { method: 'PUT', body }), onSuccess: (data) => qc.setQueryData([...notificationsKey, base, 'prefs'], data) });
 }
 
 // Follow / unfollow (FR-NOT-05)
@@ -99,7 +116,7 @@ export const useRenameFolder = () => useFileMutation(({ projectId, id, ...body }
 export const useDeleteFolder = () => useFileMutation(({ projectId, id }) => apiFetch(`/projects/${projectId}/folders/${id}`, { method: 'DELETE' }));
 
 /** A signed download/preview link, made by the server after its permission check (FR-FILE-04). */
-export const fileUrl = (fileId, versionNo, { inline = false } = {}) => apiFetch(`/files/${fileId}/versions/${versionNo}/url${toQueryString({ inline: inline || undefined })}`);
+export const fileUrl = (fileId, versionNo, { inline = false, base = '' } = {}) => apiFetch(`${base}/files/${fileId}/versions/${versionNo}/url${toQueryString({ inline: inline || undefined })}`);
 
 function csrfCookie() {
   const m = document.cookie.split('; ').find((c) => c.startsWith('cpm_csrf='));
